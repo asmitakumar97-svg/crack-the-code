@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 async function nameAndInstructions(page: Page, name: string, mode = 'Number Lock', turns = false, invite = '') {
   await page.goto(invite ? `/?room=${invite}` : '/')
+  if (!invite) await page.getByRole('button', { name: 'Play with a friend', exact: true }).click()
   await expect(page.getByText('Local multiplayer', { exact: true })).toBeVisible()
   await page.getByLabel('Your name', { exact: true }).fill(name)
   await page.getByRole('button', { name: 'Next', exact: true }).click()

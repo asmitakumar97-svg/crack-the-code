@@ -20,6 +20,7 @@ async function createPair(contexts: BrowserContext[], db: PGlite, mode = 'Number
   await Promise.all(contexts.map(c => connect(c, db)))
   const [a, b] = await Promise.all(contexts.map(c => c.newPage()))
   await a.goto('/')
+  await a.getByRole('button', { name: 'Play with a friend', exact: true }).click()
   await a.getByLabel('Your name', { exact: true }).fill('Alice')
   await a.getByRole('button', { name: 'Next', exact: true }).click()
   await a.getByRole('button', { name: mode, exact: true }).click()
@@ -382,6 +383,7 @@ test('landing instructions and illustrations follow the selected mode', async ({
     try {
       const page = await context.newPage()
       await page.goto('/')
+      await page.getByRole('button', { name: 'Play with a friend', exact: true }).click()
       await expect(page.getByRole('heading', { name: 'What’s your name?' })).toBeVisible()
       await expect(page.getByLabel('Your bet', { exact: true })).toHaveCount(0)
       const inputSize = await page.getByLabel('Your name', { exact: true }).evaluate(e => getComputedStyle(e).fontSize)

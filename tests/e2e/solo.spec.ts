@@ -87,7 +87,7 @@ test('solo timer has unlimited guesses, survives navigation and reload, and stop
     }
     await expect(page.getByLabel('Time remaining')).toBeVisible()
     await page.getByRole('button', { name: 'Back to home', exact: true }).click()
-    await expect(page.getByLabel('Your name', { exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Crack the Code', exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Play solo', exact: true }).click()
     await expect(page.locator('.history-row')).toHaveCount(9)
     await page.reload()
@@ -118,6 +118,7 @@ test('friend invitation opens multiplayer even after the player previously chose
     await expect(page.getByRole('heading', { name: 'Crack it solo.', exact: true })).toBeVisible()
     await page.goto('/?room=ABC123')
     await expect(page.getByLabel('Your name', { exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Play with a friend', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('heading', { name: 'What’s your name?', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Crack it solo.', exact: true })).toHaveCount(0)
   } finally { await context.close(); await db.close() }
 })

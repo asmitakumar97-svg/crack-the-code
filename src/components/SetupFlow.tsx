@@ -13,7 +13,7 @@ export function ScreenSteps({ current }: { current: number }) {
   </nav>
 }
 
-export function SetupFlow({ controller, mode, setMode, variant, setVariant }: { controller: Controller; mode: Mode; setMode: (mode: Mode) => void; variant: Variant; setVariant: (variant: Variant) => void }) {
+export function SetupFlow({ controller, mode, setMode, variant, setVariant, onHome }: { controller: Controller; mode: Mode; setMode: (mode: Mode) => void; variant: Variant; setVariant: (variant: Variant) => void; onHome: () => void }) {
   const invite = new URLSearchParams(location.search).get('room') ?? ''
   const [step, setStep] = useState(1)
   const [name, setName] = useState(() => localStorage.getItem('crack-the-code.name') ?? '')
@@ -34,7 +34,7 @@ export function SetupFlow({ controller, mode, setMode, variant, setVariant }: { 
       await controller.joinRoom(name.trim(), code)
     }
   }
-  return <div className="setup-flow"><ScreenSteps current={step} />
+  return <div className="setup-flow">{step === 1 && <button className="text-button" onClick={onHome}><ArrowLeft size={15} />Back to home</button>}<ScreenSteps current={step} />
     {step === 1 ? <section className="panel wizard-panel welcome-screen">
       <span className="eyebrow">JUST YOU. A FRIEND. A SECRET.</span><h1>What’s your name?</h1><p>Let the mind games begin.</p>
       {!configured && <p className="setup-note" role="status">Online play needs a Supabase connection. To play locally without an account, start this project with npm run dev:local.</p>}

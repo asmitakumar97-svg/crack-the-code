@@ -5,15 +5,17 @@ import { formatTime, getFeedback, MODES, type GameState, type Mark, type Mode, t
 import { CLUES, Legend, Tiles } from './components/Tiles'
 import { CodeEntry } from './components/CodeEntry'
 import { ScreenSteps, SetupFlow } from './components/SetupFlow'
-import { localPlay, roomStorageKey } from './lib/supabase'
+import { localPlay } from './lib/supabase'
 import { ThemeControl } from './components/ThemeControl'
 import { PlayerPanel } from './components/PlayerPanel'
 import { SoloGame } from './components/SoloGame'
 import { HistoryPanel } from './components/HistoryPanel'
 import { PlayerAvatar } from './components/PlayerAvatar'
 import { getGooglePhoto } from './lib/avatars'
+import { LandingPage } from './components/LandingPage'
 
 type Controller = ReturnType<typeof useGame>
+type HomeScreen = 'home' | 'friend' | 'solo'
 
 export default function App() {
   const controller = useGame()
@@ -21,30 +23,40 @@ export default function App() {
   const [profile, setProfile] = useState(false)
   const [homeMode, setHomeMode] = useState<Mode>('number')
   const [homeVariant, setHomeVariant] = useState<Variant>('race')
-  const [solo, setSolo] = useState(() => !new URLSearchParams(location.search).has('room') && localStorage.getItem(`${roomStorageKey}.play-mode`) === 'solo')
+  const [screen, setScreen] = useState<HomeScreen>(() => {
+    const query = new URLSearchParams(location.search)
+    return query.has('room') ? 'friend' : query.get('play') === 'solo' ? 'solo' : query.get('play') === 'friend' ? 'friend' : 'home'
+  })
+  const solo = screen === 'solo'
   const [soloChallenge, setSoloChallenge] = useState<SoloChallenge>('attempts')
   const [navigationError, setNavigationError] = useState('')
   const { roomId, game, loading, error, syncError } = controller
-  const choosePlay = (solo: boolean) => {
-    setSolo(solo)
-    try { localStorage.setItem(`${roomStorageKey}.play-mode`, solo ? 'solo' : 'multiplayer'); setNavigationError('') }
-    catch { setNavigationError('Your play mode changed, but this browser could not save the preference.') }
+  const choosePlay = (next: HomeScreen) => {
+    setScreen(next)
+    try {
+      const url = new URL(location.href)
+      if (next === 'home') { url.searchParams.delete('play'); url.searchParams.delete('room') }
+      else url.searchParams.set('play', next)
+      history.replaceState(null, '', url)
+      setNavigationError('')
+    } catch { setNavigationError('Your screen changed, but this browser could not update the page address. Reloading may return you to the welcome screen.') }
   }
+  const home = () => { controller.home(); choosePlay('home') }
+  useEffect(() => { window.scrollTo(0, 0) }, [screen])
   return <div className="app-shell">
     <header className="site-header"><div className="brand"><img src={`${import.meta.env.BASE_URL}favicon.svg?v=lock-tiles`} width={48} height={48} alt="" /><span className="brand-wordmark">Crack the Code<small>A LITTLE LOGIC. A LITTLE MAGIC.</small></span></div><div className="header-actions"><ThemeControl /><button className="icon-button account-button" aria-label="Player account and bet history" onClick={() => setProfile(true)}><PlayerAvatar identity={controller.userId} name="You" photoUrl={getGooglePhoto(controller.account)} /></button><button className="icon-button" aria-label="How to play" onClick={() => setHelp(true)}><CircleHelp size={20} /></button></div></header>
     <main>
       {localPlay && <div className="local-play-notice" role="status"><strong>Local multiplayer</strong><span>Player 2: open this address in a private browser window. Updates every second.</span></div>}
       {(error || syncError) && <div className="error-banner" role="alert"><span>{error || syncError}</span>{error && <button className="icon-button" aria-label="Dismiss error" onClick={controller.dismissError}><X size={17} /></button>}</div>}
       {navigationError && <p className="field-error" role="alert">{navigationError}</p>}
-      {!roomId && <div className="play-mode-picker" role="group" aria-label="Play mode"><button className={`button ${solo ? 'secondary' : 'primary'}`} aria-pressed={!solo} disabled={controller.busy} onClick={() => choosePlay(false)}>Play with a friend</button><button className={`button ${solo ? 'primary' : 'secondary'}`} aria-pressed={solo} disabled={controller.busy} onClick={() => choosePlay(true)}>Play solo</button></div>}
-      {!roomId ? solo ? <SoloGame userId={controller.userId} mode={homeMode} challenge={soloChallenge} onModeChange={setHomeMode} onChallengeChange={setSoloChallenge} onHelp={() => setHelp(true)} onHome={() => choosePlay(false)} /> : <SetupFlow controller={controller} mode={homeMode} setMode={setHomeMode} variant={homeVariant} setVariant={setHomeVariant} /> : !game ? <section className="panel loading-panel">{loading ? <LoaderCircle className="spin mint" size={28} /> : <WifiOff size={28} />}<h1>{loading ? 'Opening your room…' : 'Couldn’t connect'}</h1><button className="button secondary" onClick={controller.home}>Back</button></section> : <Game controller={controller} game={game} onHelp={() => setHelp(true)} />}
+      {!roomId ? screen === 'home' ? <LandingPage onPlay={choosePlay} onHelp={() => setHelp(true)} busy={controller.busy} /> : solo ? <SoloGame userId={controller.userId} mode={homeMode} challenge={soloChallenge} onModeChange={setHomeMode} onChallengeChange={setSoloChallenge} onHelp={() => setHelp(true)} onHome={() => choosePlay('home')} /> : <SetupFlow controller={controller} mode={homeMode} setMode={setHomeMode} variant={homeVariant} setVariant={setHomeVariant} onHome={() => choosePlay('home')} /> : !game ? <section className="panel loading-panel">{loading ? <LoaderCircle className="spin mint" size={28} /> : <WifiOff size={28} />}<h1>{loading ? 'Opening your room…' : 'Couldn’t connect'}</h1><button className="button secondary" onClick={home}>Back</button></section> : <Game controller={controller} game={game} onHelp={() => setHelp(true)} onHome={home} />}
     </main>
     {help && <Rules mode={game?.room.mode ?? homeMode} turns={(game?.room.variant ?? homeVariant) === 'turns'} solo={!roomId && solo ? soloChallenge : undefined} onClose={() => setHelp(false)} />}
     {profile && <Modal title="Your player & bets" onClose={() => setProfile(false)}><PlayerPanel userId={controller.userId} user={controller.account} inRoom={Boolean(roomId) || solo} /></Modal>}
   </div>
 }
 
-function Game({ controller, game, onHelp }: { controller: Controller; game: GameState; onHelp: () => void }) {
+function Game({ controller, game, onHelp, onHome }: { controller: Controller; game: GameState; onHelp: () => void; onHome: () => void }) {
   const { room, players } = game
   const me = players.find(player => player.user_id === controller.userId)!
   const opponent = players.find(player => player.user_id !== controller.userId)
@@ -65,7 +77,7 @@ function Game({ controller, game, onHelp }: { controller: Controller; game: Game
     {preparing ? <RoomStage key={`${room.match_number}-${room.round_number}`} controller={controller} game={game} me={me} opponent={opponent} /> :
       room.status === 'playing' ? countdown > 0 ? <section className="panel countdown-screen" aria-live="polite"><span className="eyebrow">THE HOST STARTED THE ROUND</span><h1>Get ready.</h1><strong className="countdown-number" key={countdown}>{countdown}</strong><p>You both start together.</p><OwnSecret game={game} /></section> : <Arena key={`${room.match_number}-${room.round_number}`} controller={controller} game={game} me={me} opponent={opponent!} elapsed={elapsed} onHelp={onHelp} /> :
         <Results game={game} me={me} opponent={opponent!} controller={controller} />}
-    {leave && <Modal title="Leave the table?" onClose={() => setLeave(false)}><p>Your match stays saved. Rejoin with this browser and the room code.</p><div className="modal-actions"><button className="button secondary" onClick={() => setLeave(false)}>Stay</button><button className="button primary" onClick={controller.home}>Home</button></div></Modal>}
+    {leave && <Modal title="Leave the table?" onClose={() => setLeave(false)}><p>Your match stays saved. Rejoin with this browser and the room code.</p><div className="modal-actions"><button className="button secondary" onClick={() => setLeave(false)}>Stay</button><button className="button primary" onClick={onHome}>Home</button></div></Modal>}
   </section>
 }
 

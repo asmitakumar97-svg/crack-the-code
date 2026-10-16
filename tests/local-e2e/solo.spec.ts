@@ -23,7 +23,7 @@ test('real local solo word challenge stops after six guesses and can restart wit
   await expect(page.getByLabel('Your guess', { exact: true })).toBeVisible()
   await expect(page.locator('.history-row')).toHaveCount(0)
   await page.getByRole('button', { name: 'Back to home', exact: true }).click()
-  await expect(page.getByLabel('Your name', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Crack the Code', exact: true })).toBeVisible()
 })
 
 test('real local timed solo keeps accepting valid words beyond six guesses', async ({ page }) => {
