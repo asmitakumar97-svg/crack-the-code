@@ -1,10 +1,25 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { formatTime, generateSecret, validateEntry } from '../src/lib/game'
+import { formatTime, generateSecret, getFeedback, validateEntry } from '../src/lib/game'
+
+describe('automatic clue colours', () => {
+  it('reserves exact copies before assigning yellow clues left to right', () => {
+    expect(getFeedback('SECRET', 'STREET')).toEqual(['hit', 'miss', 'present', 'present', 'hit', 'hit'])
+    expect(getFeedback('1123', '0111')).toEqual(['miss', 'hit', 'present', 'miss'])
+  })
+  it('leaves entirely absent items grey and colours every exact match green', () => {
+    expect(getFeedback('0011', '2222')).toEqual(['miss', 'miss', 'miss', 'miss'])
+    expect(getFeedback('LETTER', 'LETTER')).toEqual(['hit', 'hit', 'hit', 'hit', 'hit', 'hit'])
+  })
+  it.each([['', ''], ['1234', '123'], ['TREE', 'LETTER']])('rejects invalid lengths for %s / %s', (secret, guess) => {
+    expect(() => getFeedback(secret, guess)).toThrow('same nonzero length')
+  })
+})
 
 describe('client validation', () => {
   it('accepts duplicates and leading zeros', () => {
-    expect(validateEntry('number', '0011', [])).toBeNull()
-    expect(validateEntry('word', 'LETTER', ['LETTER'])).toBeNull()
+    expect(validateEntry('number', '0011')).toBeNull()
+    expect(validateEntry('word', 'LETTER')).toBeNull()
+    expect(validateEntry('word', 'NORMAL')).toBeNull()
   })
 
   describe('random private secrets', () => {
@@ -24,7 +39,7 @@ describe('client validation', () => {
       randomValues([0, 1, 1, 2])
       const secret = generateSecret('number', [])
       expect(secret).toBe('0112')
-      expect(validateEntry('number', secret, [])).toBeNull()
+      expect(validateEntry('number', secret)).toBeNull()
     })
 
     it('selects a valid word from the loaded word bank', () => {
@@ -32,7 +47,7 @@ describe('client validation', () => {
       const words = ['SECRET', 'LETTER', 'STREET']
       const secret = generateSecret('word', words)
       expect(secret).toBe('LETTER')
-      expect(validateEntry('word', secret, words)).toBeNull()
+      expect(validateEntry('word', secret)).toBeNull()
     })
 
     it('does not silently invent a word when the bank is unavailable', () => {
@@ -45,12 +60,12 @@ describe('client validation', () => {
       expect(random).toHaveBeenCalledTimes(5)
     })
   })
-  it('rejects malformed and non-dictionary entries', () => {
-    expect(validateEntry('number', '123', [])).not.toBeNull()
-    expect(validateEntry('number', '12AB', [])).not.toBeNull()
-    expect(validateEntry('word', 'TREE', ['LETTER'])).not.toBeNull()
-    expect(validateEntry('word', 'APPLE', ['LETTER'])).not.toBeNull()
-    expect(validateEntry('word', 'XXXXXX', ['LETTER'])).toBe("That word is not in this game's dictionary. Try another six-letter word.")
+  it('rejects malformed entries without relying on a client dictionary', () => {
+    expect(validateEntry('number', '123')).not.toBeNull()
+    expect(validateEntry('number', '12AB')).not.toBeNull()
+    expect(validateEntry('word', 'TREE')).not.toBeNull()
+    expect(validateEntry('word', 'APPLE')).not.toBeNull()
+    expect(validateEntry('word', 'APPLES')).toBeNull()
   })
   it('formats and clamps round timers', () => {
     expect(formatTime(300)).toBe('05:00')

@@ -44,7 +44,7 @@ For public hosting, follow the Supabase setup below and use `npm run dev`/`npm r
 ## Current rules
 
 - **Number Lock:** four digits, including leading zeros and repeats.
-- **Word Lock:** real **six-letter words**, checked against the game's internal dictionary. There is no visible word-bank button or list.
+- **Word Lock:** real **six-letter words**, checked by the server against an expanded English dictionary of over 11,000 words, including common inflections and American/British spellings. `NORMAL`, `APPLES` and `FRUITS` are accepted. Any valid word may be tried, even if it contradicts previous green/yellow clues: this is not a forced-clue or hard mode. The browser checks length/characters only, so a loading, stale or unavailable local dictionary cannot wrongly reject a valid word; the server still rejects made-up entries such as `XXXXXX`. There is no visible word-bank button or list.
 - **Wordle-style clues in both modes:** green/mint means the correct digit or letter in the correct position; yellow means a matching item in the wrong position; grey/slate means no unused matching copy remains. Exact positions are reserved first, then remaining copies are allocated left to right. A grey extra copy does not mean that character is entirely absent.
 - Only the **exact secret in the exact order** wins. All-yellow tiles do not count as a solve. Keyboard colours retain the strongest earned clue: green before yellow before grey.
 - Four screens replace the long landing page: **Name → How to play → Room & secret → Play**.
@@ -52,11 +52,13 @@ For public hosting, follow the Supabase setup below and use `npm run dev`/`npm r
 - Your own secret is **always visible on your screen** while typing and after locking. A **Your code / Your word** card stays visible during the countdown and gameplay, including while marking hints or waiting for a turn. There is no Show/Hide step. This uses only your authorized `own_secret`; it does not reveal the opponent's answer. Be mindful of people looking at your screen or screen sharing.
 - Setup is **Secret → Bets → Agree → Play**. Both players choose and lock their secrets before accessing bets. A successful lock opens **The bets** automatically; failed validation stays on secret entry. Bet editing, review, agreement and **Start game / Start round** live only on the bets screen. Only the host can start, once both secrets are locked and both players have agreed. The server enforces the same requirements. Reloading a locked secret returns to Bets, with your own secret still visible. Both see a shared six-second countdown.
 - **Live race:** both players guess simultaneously; a visible timer tracks elapsed time only.
-- **Take turns:** exactly one guess each, alternating without a turn limit. The secret owner marks green, yellow or grey clues; tap a tile to cycle grey → yellow → green. The server verifies hints before publishing them. There is no elapsed timer on this screen. The opening player swaps each round. The first correct answer ends the round immediately; there is no extra reply guess after a solve.
+- **Take turns:** exactly one guess each, alternating without a turn limit. The secret owner taps matching tiles in the submitted guess; each tap automatically chooses green for an exact position or yellow for a remaining matching copy. Tap again to deselect. Non-matches stay grey, and tapping one explains that no unused match remains. **Check & send hints** highlights missed matching tiles and names their positions, without sending incomplete clues or advancing the turn. Colours use only the owner's authorized secret and reserve exact copies before allocating yellow copies left to right, regardless of tap order. The server independently verifies all hints before publishing them. There is no elapsed timer on this screen. The opening player swaps each round. The first correct answer ends the round immediately; there is no extra reply guess after a solve.
 - The **first exact solve accepted by the server wins the round immediately**, even if that player used more guesses. Guessing stops for both players and both secrets are revealed. Room locks serialize close finishes into one winner; late guesses cannot change the result. Both players choose **Ready for round N** before setting new secrets, then the host explicitly starts. Bet agreements carry across rounds and reset on a new match or a changed bet. There is no automatic next-round timer.
 - **Unlimited guesses** in both modes. Attempt counts remain visible, without a maximum. There is no automatic draw after eight guesses.
 - Best of three: a player reaching two wins ends the match early. Otherwise the match ends after three rounds. A tied final score draws, with no bet won.
 - **No time limit** and no automatic room expiry. Elapsed time is recorded but never determines the winner. Disconnected players can return with the same browser identity.
+- **Pastel / Dark themes:** choose in the header. Pastel is the default; the preference is saved on that browser and survives reloads. Green/yellow/grey meanings and clue symbols stay the same in both themes.
+- **Private bet history:** open the player icon in the header. Completed matches preserve the original winning bet, opponent display name, date and scores, even after rematches or changed bets. Filter wins/losses/all results, search by opponent name, and load older entries. Only the two participants can read each record. Guest history belongs to the guest identity; Google accounts make future signed-in games accessible across devices after provider setup below. No codes, guesses, email addresses or Google profile details are included in history.
 
 ## Written bets
 
@@ -88,15 +90,17 @@ export PATH="/opt/homebrew/bin:$PATH"
 
 1. Create a project at [Supabase](https://supabase.com/dashboard).
 2. Under **Authentication → Sign In / Providers**, enable **Anonymous Sign-Ins**.
-3. Open **SQL Editor** and run all six migrations **in this order**:
+3. Open **SQL Editor** and run all eight migrations **in this order**:
    - [`202610160001_game.sql`](./supabase/migrations/202610160001_game.sql)
    - [`202610160002_race_bets.sql`](./supabase/migrations/202610160002_race_bets.sql)
    - [`202610160003_host_turns.sql`](./supabase/migrations/202610160003_host_turns.sql)
    - [`202610160004_wordle_feedback.sql`](./supabase/migrations/202610160004_wordle_feedback.sql)
    - [`202610160005_six_letter_unlimited.sql`](./supabase/migrations/202610160005_six_letter_unlimited.sql)
    - [`202610160006_code_first_setup.sql`](./supabase/migrations/202610160006_code_first_setup.sql)
-4. Only run migrations you have not applied yet. Existing installations with the first four need **the fifth and sixth**, each run as one complete query. Migrations two and three restart matches; migration four preserves matches while recalculating Wordle clues. Migration five preserves Number Lock games, removes guess limits, separates consent from secret entry, and replaces the internal dictionary with six-letter words. **Existing Word Lock rooms restart at preparation with their bets retained**, because four-letter secrets cannot be played with six-letter guesses; historical secrets/results remain protected. No RLS policies or client permissions change. Apply the migrations before deploying the frontend, then refresh both players' game pages.
-   Installations already on migration five need **only migration six**. Migration six allows room creation before writing a bet and requires a locked secret before agreeing. It preserves all existing rooms, secrets, guesses, scores and bets, and changes no table permissions or RLS policies.
+   - [`202610160007_expanded_dictionary.sql`](./supabase/migrations/202610160007_expanded_dictionary.sql)
+   - [`202610160008_bet_history.sql`](./supabase/migrations/202610160008_bet_history.sql)
+4. Only run migrations you have not applied yet. Existing installations with the first four need **five through eight**, each run as one complete query. Migrations two and three restart matches; migration four preserves matches while recalculating Wordle clues. Migration five preserves Number Lock games, removes guess limits, separates consent from secret entry, and replaces the internal dictionary with six-letter words. **Existing Word Lock rooms restart at preparation with their bets retained**, because four-letter secrets cannot be played with six-letter guesses; historical secrets/results remain protected. Migrations five through seven do not change existing RLS policies or client permissions; eight adds protected history. Apply the migrations before deploying the frontend, then refresh both players' game pages.
+   Installations already on migration five need **six, seven and eight**; installations on six need **seven and eight**. Migration six allows room creation before writing a bet and requires a locked secret before agreeing. Migration seven adds dictionary entries without removing existing words or resetting games. Migration eight adds a read-only, participant-protected history table and snapshots each completed match before a rematch can overwrite its bets. It also archives rooms currently at `match_over`; bets from older, already-rematched games cannot be reconstructed. These updates preserve existing rooms, secrets, guesses, scores and bets. Do not add `bet_history` to Realtime publications.
 5. Verify **Database → Publications → supabase_realtime** contains `rooms` only for this app. Do **not** publish `secrets` or `guesses`.
 6. Copy your project URL and **publishable key** (or legacy public `anon` key). Never use a secret/service-role key in the browser.
 
@@ -151,8 +155,8 @@ Open Vite's printed address, usually `http://localhost:5173`. Restart after chan
 
 1. Start a Take turns room with A's secret `1122` and B's secret `3344`.
 2. A opens round one and guesses `3333`. The guess leaves A's field and B sees a manual clue screen. A sees **no feedback yet** and cannot submit another guess.
-3. B sees their own secret privately and taps the first two `3` tiles twice each to mark them green (grey → yellow → green). Choosing **Check & send hints** with all four grey (or any other wrong combination) is rejected by the server; nothing is sent to A.
-4. Correct hints publish to A's history, and it becomes B's guessing turn. A cannot mark their own clues or guess out of turn. Mark exact positions green first, then assign remaining matching copies yellow from left to right.
+3. B sees their own secret privately. Choosing **Check & send hints** before selecting any tiles highlights positions 1 and 2 as missed clues; nothing is sent to A. Tap each of the first two `3` tiles once: they automatically turn green. Tapping an extra `3` leaves it grey and explains that no unused copy remains. Tap a selected tile again to deselect it, then check again to see the missed-position warning.
+4. Select both matching tiles and choose **Check & send hints**. The server independently verifies the colours, correct hints publish to A's history, and it becomes B's guessing turn. A cannot mark their own clues or guess out of turn. Exact positions are reserved first and remaining matching copies become yellow left to right, even when tiles are tapped in a different order. For an entirely non-matching guess, all-grey clues can be sent without selecting any tiles.
 5. An exact secret match is always resolved by the server immediately, without waiting for the other player to approve the win. A losing player cannot suppress a legitimate win by refusing to send clues.
 6. Reload either browser while hints are pending. The submitted guess recovers; unsent clue selections do not. The secret owner's screen can mark the hints again.
 
@@ -200,11 +204,39 @@ npm run test:e2e
 npm run test:local
 ```
 
-Unit/integration tests run **all six actual migrations** in embedded PostgreSQL (PGlite), with test-only auth/roles. They check all 6,561 four-item feedback pairs against an independent position-and-frequency oracle, six-letter duplicate handling, legacy migration without resetting Number Lock, RLS, host authority, shared start gating, simultaneous solves, validated manual hints, unlimited alternating turns, best-of-three scoring, code-before-consent enforcement and rematches. Browser tests verify six-letter words, larger word keys, absence of a visible word bank, code-first setup, automatic navigation to Bets only after successful locking, bets-only agreement/start, reload recovery, more than eight race guesses, colours, synchronized reveals and waiting for both players before advancing.
+Unit/integration tests run **all eight actual migrations** in embedded PostgreSQL (PGlite), with test-only auth/roles. They compare client/server feedback for all 6,561 four-item pairs against an independent oracle, check expanded dictionary coverage and unrestricted valid guesses, and cover game authorization, best-of-three play, immutable participant-only history and cursor pagination. Browser tests cover code-first setup, larger keys, automatic clue colours, missed/invalid/deselected clues, all-grey feedback, unlimited guesses, synchronized stops/reveals, saved themes and private history. Cross-device account history is tested with isolated sessions sharing the same authenticated identity; real Google login requires the provider setup below.
 
 Browser tests use two isolated contexts connected to those same real SQL functions through a **test-only transport**. WebSockets are disabled to verify polling recovery. This is not a replacement for testing a real hosted Supabase project: follow the two-person checklist to verify hosted Auth, PostgREST and Realtime.
 
 `npm run test:local` separately starts the real local HTTP server with an ephemeral in-memory database and drives mobile Chromium/WebKit and desktop browsers without intercepting any backend requests. HTTP tests cover private secrets, authentication/identity isolation, origin/argument checks and persistence across a disk-backed server restart.
+
+## English dictionary
+
+The expanded word list is generated from [SCOWL 2020.12.07](https://wordlist.aspell.net/), combining English, American, British (`-ise` and `-ize`), Canadian and Australian `words` lists and level-one spelling variants through size 70. It keeps only lowercase ASCII six-letter entries, converts them to uppercase, and retains all previously accepted words. Proper-name lists, abbreviations, apostrophes and accented/hyphenated entries are not imported. This is a broad offline dictionary, not a guarantee of every technical term or newly coined word.
+
+The permitted redistribution terms and source credits are included verbatim in [`third-party/SCOWL-Copyright.txt`](./third-party/SCOWL-Copyright.txt). The generated migration includes 11,002 entries before merging with the existing list. Regenerate only when intentionally creating/updating an unapplied migration; never edit a migration that has already been deployed:
+
+```sh
+curl -fL https://downloads.sourceforge.net/wordlist/scowl-2020.12.07.tar.gz -o /tmp/scowl-2020.12.07.tar.gz
+node scripts/generate-word-bank.mjs /tmp/scowl-2020.12.07.tar.gz
+```
+
+The generator verifies archive SHA-256 `5587667caa20c4891390c2d42dbb4d5c4c3f41bee77af1457ece3ba23fb859cc` before extracting data. No dictionary API receives secrets or guesses. The server is the authority for real-word membership; the downloaded browser list only supplies random-secret choices. Accepted guesses never have to follow earlier clues.
+
+## Google accounts and bet history
+
+**Google sign-in is disabled by default until configured.** Guest play and participant-only bet history work immediately. To enable cross-device accounts:
+
+1. In Google Cloud, configure an OAuth consent screen and a **Web application** OAuth client. If the consent screen is in Testing, add your players as test users, or publish it before inviting the public.
+2. Add your site's origin as an authorized JavaScript origin, for example `https://asmitakumar97-svg.github.io`. Add **Supabase's callback URL**, `https://YOUR_PROJECT.supabase.co/auth/v1/callback`, as the authorized redirect URI. Copy the exact callback from Supabase's Google provider screen.
+3. Under Supabase **Authentication → Sign In / Providers → Google**, enable Google and enter the client ID and client secret **there only**. Never put the OAuth secret in source code, a `VITE_` variable, GitHub Pages, or chat.
+4. Under Supabase **Authentication → URL Configuration**, set the Site URL to `https://asmitakumar97-svg.github.io/crack-the-code/` and allow that exact redirect URL. For development, also allow `http://localhost:5173/`.
+5. Set the public build flag `VITE_GOOGLE_AUTH_ENABLED=true`. For GitHub Pages, add it under repository **Settings → Secrets and variables → Actions → Variables**, then redeploy the Pages workflow. For local Supabase-backed development, set it in `.env` and restart Vite. Leave it false until the provider and redirects work.
+6. Open the player icon, choose **Sign in with Google**, and sign in **before** creating or joining a match. Complete a match, open the same Google account in a separate browser/device, and verify the saved bet and opponent appear. Check that an unrelated account cannot see it.
+
+Signing in changes the player identity; guest matches/history are not merged into a Google account. Finish a match and return Home before switching accounts. The account panel blocks switching while a room is open. Signing out affects only the current device. Google's tokens stay managed by Supabase Auth; ledger rows contain only game participant IDs, display-name/bet snapshots, scores, mode and completion time. Rows are read-only to players under RLS and are not broadcast through Realtime.
+
+The ledger records whole-match outcomes, not each round, and treats written bets as friendly commitments, not money transfers. Existing currently completed rooms are archived on migration; already-rematched historical bets cannot be recovered. Deleting a room or participant account deletes its ledger rows through foreign-key cascades.
 
 ## Deployment and troubleshooting
 
@@ -238,5 +270,5 @@ For Vercel or Netlify, use build command `npm run build`, output directory `dist
 - **Only one player:** use separate profiles/private windows.
 - **No updates:** check Realtime publication membership; polling still refreshes every five seconds.
 - **Bets changed:** read the new bets and agree again. Changing any bet intentionally clears both agreements.
-- **Word rejected:** enter a real six-letter word recognized by the game's dictionary. The word-bank list is hidden; **Choose for me** can pick a valid secret.
+- **Word rejected:** refresh old tabs, then enter a real six-letter English word. Guesses need not follow earlier clues. Validation runs on the server even if the random-secret dictionary is still loading. The expanded dictionary includes common plurals and US/UK spellings but may omit unusual terms; **Choose for me** can pick a recognized secret once its word list loads.
 - **Clipboard unavailable:** manually share the room code, or use HTTPS.

@@ -10,6 +10,7 @@ function validUrl(value: string | undefined): boolean {
   catch { return false }
 }
 export const localPlay = import.meta.env.VITE_LOCAL_GAME === true
+export const googleAuthEnabled = !localPlay && import.meta.env.VITE_GOOGLE_AUTH_ENABLED === 'true'
 const cloudConfigured = Boolean(validUrl(url) && key && !key.includes('YOUR_'))
 export const configured = localPlay || cloudConfigured
 export const supabase = !localPlay && cloudConfigured ? createClient(url, key) : null

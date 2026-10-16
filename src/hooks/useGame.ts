@@ -28,6 +28,8 @@ export function useGame() {
 
   useEffect(() => {
     if (!configured) return
+    const authError = new URLSearchParams(location.hash.slice(1)).get('error_description') ?? new URLSearchParams(location.search).get('error_description')
+    if (authError) setError(`Google sign-in did not complete: ${authError}`)
     let active = true
     void authenticate().then(id => {
       if (!active) return

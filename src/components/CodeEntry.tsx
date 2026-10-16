@@ -11,7 +11,7 @@ export function CodeEntry({ mode, secret = false, words, busy, onSubmit, guesses
   const id = useId()
   const config = MODES[mode]
   const submit = async () => {
-    const validation = validateEntry(mode, value, words)
+    const validation = validateEntry(mode, value)
     if (validation) { setError(validation); return }
     if (await onSubmit(value)) { setValue(''); setError('') }
   }
@@ -40,7 +40,7 @@ export function CodeEntry({ mode, secret = false, words, busy, onSubmit, guesses
     <div className="entry-label">
       <label htmlFor={id}>{secret ? mode === 'word' ? 'Your secret word' : 'Your secret code' : mode === 'word' ? 'Try their word' : 'Try their code'}</label>
       {secret && <div className="entry-tools">
-        <button className="text-button" type="button" disabled={busy} onClick={chooseSecret}><Shuffle size={14} />Choose for me</button>
+        <button className="text-button" type="button" disabled={busy || mode === 'word' && !words.length} aria-description={mode === 'word' && !words.length ? 'Available once the dictionary loads.' : undefined} onClick={chooseSecret}><Shuffle size={14} />Choose for me</button>
       </div>}
     </div>
     <div className="entry-box">

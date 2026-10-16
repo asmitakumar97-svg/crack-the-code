@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
 import { readFile } from 'node:fs/promises'
 import { asUser, call, createDatabase, launch, roomPair, start, state, user } from './database'
-import { validateEntry } from '../src/lib/game'
+import { getFeedback, validateEntry } from '../src/lib/game'
 
 let db: PGlite
 beforeAll(async () => { db = await createDatabase() })
@@ -28,6 +28,7 @@ describe('Wordle-style, duplicate-safe feedback', () => {
   ])('scores secret %s / guess %s with exact positions reserved first', async (secret, guess, expected) => {
     const result = await db.query<{ marks: string[] }>('select private.feedback($1,$2) as marks', [secret, guess])
     expect(result.rows[0].marks).toEqual(expected)
+    expect(getFeedback(secret, guess)).toEqual(expected)
   })
   it('matches an independent position-and-frequency oracle for all 6,561 four-item pairs', async () => {
     const codes = Array.from({ length: 81 }, (_, n) => n.toString(3).padStart(4, '0'))
@@ -46,6 +47,7 @@ describe('Wordle-style, duplicate-safe feedback', () => {
         return used <= available ? 'present' : 'miss'
       })
       expect(marks).toEqual(oracle)
+      expect(getFeedback(secret, guess)).toEqual(oracle)
       expect(marks.every(m => m === 'hit')).toBe(secret === guess)
     }
   })
@@ -58,7 +60,8 @@ describe('Wordle-style, duplicate-safe feedback', () => {
     const sql = await readFile(new URL('../supabase/migrations/202610160004_wordle_feedback.sql', import.meta.url), 'utf8')
     const unlimited = await readFile(new URL('../supabase/migrations/202610160005_six_letter_unlimited.sql', import.meta.url), 'utf8')
     const codeFirst = await readFile(new URL('../supabase/migrations/202610160006_code_first_setup.sql', import.meta.url), 'utf8')
-    await db.transaction(async tx => { await tx.exec(sql); await tx.exec(unlimited); await tx.exec(codeFirst) })
+    const dictionary = await readFile(new URL('../supabase/migrations/202610160007_expanded_dictionary.sql', import.meta.url), 'utf8')
+    await db.transaction(async tx => { await tx.exec(sql); await tx.exec(unlimited); await tx.exec(codeFirst); await tx.exec(dictionary) })
     const after = await state(db, pair.a, pair.room)
     expect(after.room).toEqual({ ...before.room, version: before.room.version + 2 })
     expect(after.players).toEqual(before.players)
@@ -80,7 +83,8 @@ describe('Wordle-style, duplicate-safe feedback', () => {
     const previousWord = await state(db, word.a, word.room)
     const sql = await readFile(new URL('../supabase/migrations/202610160005_six_letter_unlimited.sql', import.meta.url), 'utf8')
     const codeFirst = await readFile(new URL('../supabase/migrations/202610160006_code_first_setup.sql', import.meta.url), 'utf8')
-    await db.transaction(async tx => { await tx.exec(sql); await tx.exec(codeFirst) })
+    const dictionary = await readFile(new URL('../supabase/migrations/202610160007_expanded_dictionary.sql', import.meta.url), 'utf8')
+    await db.transaction(async tx => { await tx.exec(sql); await tx.exec(codeFirst); await tx.exec(dictionary) })
     const after = await state(db, number.a, number.room)
     expect(after.room).toEqual({ ...before.room, version: before.room.version + 1 })
     expect(after.guesses).toEqual(before.guesses)
@@ -318,14 +322,24 @@ describe('first-to-finish races and best of three', () => {
   })
   it('contains real six-letter words only, with no shorter legacy entries', async () => {
     const words = (await db.query<{ word: string }>('select word from public.word_bank')).rows.map(r => r.word)
-    expect(words.length).toBeGreaterThan(500)
-    expect(words).toEqual(expect.arrayContaining(['SECRET', 'LETTER', 'BANANA', 'ORANGE', 'PUZZLE', 'COFFEE']))
+    expect(words.length).toBeGreaterThan(11000)
+    expect(words).toEqual(expect.arrayContaining(['SECRET', 'LETTER', 'BANANA', 'ORANGE', 'PUZZLE', 'COFFEE', 'NORMAL', 'APPLES', 'FRUITS', 'BOILED', 'UNSEEN', 'ZIGZAG', 'COLOUR', 'COLORS']))
     for (const word of words) {
       expect(word).toMatch(/^[A-Z]{6}$/)
-      expect(validateEntry('word', word, words)).toBeNull()
+      expect(validateEntry('word', word)).toBeNull()
     }
     expect(words).not.toContain('APPLE')
     expect(words).not.toContain('MINT')
+    expect(words).not.toContain('XXXXXX')
+  })
+  it('accepts real words that contradict earlier positional clues and still rejects made-up words', async () => {
+    const pair = await roomPair(db, 'word')
+    await start(db, pair, ['APPLES', 'SECRET'])
+    await call(db, pair.a, 'submit_guess', [pair.room, 'STREET', 1])
+    await call(db, pair.a, 'submit_guess', [pair.room, ' normal ', 2])
+    await call(db, pair.a, 'submit_guess', [pair.room, 'FRUITS', 3])
+    expect((await state(db, pair.a, pair.room)).guesses.map(guess => guess.guess)).toEqual(['STREET', 'NORMAL', 'FRUITS'])
+    await expect(call(db, pair.a, 'submit_guess', [pair.room, 'XXXXXX', 4])).rejects.toThrow('real six-letter word')
   })
   it('publishes rooms only, never guesses or secrets', async () => {
     const tables = await db.query<{ tablename: string }>("select tablename from pg_publication_tables where pubname='supabase_realtime'")

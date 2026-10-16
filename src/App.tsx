@@ -1,28 +1,32 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, Check, CheckCheck, CircleHelp, Clock3, CodeXml, Copy, Flame, Leaf, LoaderCircle, LockKeyhole, Repeat2, Trophy, Users, WifiOff, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCheck, CircleHelp, Clock3, CodeXml, Copy, Flame, Leaf, LoaderCircle, LockKeyhole, Repeat2, Trophy, UserRound, Users, WifiOff, X } from 'lucide-react'
 import { useGame } from './hooks/useGame'
-import { formatTime, MODES, type GameState, type Mark, type Mode, type Player, type Variant } from './lib/game'
+import { formatTime, getFeedback, MODES, type GameState, type Mark, type Mode, type Player, type Variant } from './lib/game'
 import { CLUES, Legend, Tiles } from './components/Tiles'
 import { CodeEntry } from './components/CodeEntry'
 import { ScreenSteps, SetupFlow } from './components/SetupFlow'
 import { localPlay } from './lib/supabase'
+import { ThemeControl } from './components/ThemeControl'
+import { PlayerPanel } from './components/PlayerPanel'
 
 type Controller = ReturnType<typeof useGame>
 
 export default function App() {
   const controller = useGame()
   const [help, setHelp] = useState(false)
+  const [profile, setProfile] = useState(false)
   const [homeMode, setHomeMode] = useState<Mode>('number')
   const [homeVariant, setHomeVariant] = useState<Variant>('race')
   const { roomId, game, loading, error, syncError } = controller
   return <div className="app-shell">
-    <header className="site-header"><div className="brand"><span className="brand-icon"><CodeXml size={23} /></span><span>crack<span className="brand-light">the</span>code<span className="mint">.</span></span></div><button className="icon-button" aria-label="How to play" onClick={() => setHelp(true)}><CircleHelp size={20} /></button></header>
+    <header className="site-header"><div className="brand"><span className="brand-icon"><CodeXml size={23} /></span><span>crack<span className="brand-light">the</span>code<span className="mint">.</span></span></div><div className="header-actions"><ThemeControl /><button className="icon-button" aria-label="Player account and bet history" onClick={() => setProfile(true)}><UserRound size={20} /></button><button className="icon-button" aria-label="How to play" onClick={() => setHelp(true)}><CircleHelp size={20} /></button></div></header>
     <main>
       {localPlay && <div className="local-play-notice" role="status"><strong>Local multiplayer</strong><span>Player 2: open this address in a private browser window. Updates every second.</span></div>}
       {(error || syncError) && <div className="error-banner" role="alert"><span>{error || syncError}</span>{error && <button className="icon-button" aria-label="Dismiss error" onClick={controller.dismissError}><X size={17} /></button>}</div>}
       {!roomId ? <SetupFlow controller={controller} mode={homeMode} setMode={setHomeMode} variant={homeVariant} setVariant={setHomeVariant} /> : !game ? <section className="panel loading-panel">{loading ? <LoaderCircle className="spin mint" size={28} /> : <WifiOff size={28} />}<h1>{loading ? 'Opening your room…' : 'Couldn’t connect'}</h1><button className="button secondary" onClick={controller.home}>Back</button></section> : <Game controller={controller} game={game} onHelp={() => setHelp(true)} />}
     </main>
     {help && <Rules mode={game?.room.mode ?? homeMode} turns={(game?.room.variant ?? homeVariant) === 'turns'} onClose={() => setHelp(false)} />}
+    {profile && <Modal title="Your player & bets" onClose={() => setProfile(false)}><PlayerPanel userId={controller.userId} inRoom={Boolean(roomId)} /></Modal>}
   </div>
 }
 
@@ -138,12 +142,34 @@ function Arena({ controller, game, me, opponent, elapsed, onHelp }: { controller
 
 function HintEditor({ controller, game }: { controller: Controller; game: GameState }) {
   const [marks, setMarks] = useState<Mark[]>(() => Array<Mark>(MODES[game.room.mode].length).fill('miss'))
+  const [checked, setChecked] = useState(false)
+  const [rejected, setRejected] = useState<number | null>(null)
+  const errorId = useId()
   const pending = game.pending_guess!
-  return <div className="hint-editor"><span className="hint-label">Your secret · for your eyes only</span><Tiles mode={game.room.mode} value={game.own_secret ?? ''} length={MODES[game.room.mode].length} /><p>Mark your friend’s guess. Tap to change: grey → yellow → green.</p>
+  if (!game.own_secret || game.own_secret.length !== MODES[game.room.mode].length || pending.guess.length !== game.own_secret.length) {
+    return <p className="field-error" role="alert">Your secret or the pending guess could not be loaded. Reload the page before marking clues.</p>
+  }
+  const expected = getFeedback(game.own_secret, pending.guess)
+  const missed = expected.flatMap((mark, i) => mark !== marks[i] ? [i] : [])
+  const error = rejected !== null ? `Position ${rejected + 1} (${pending.guess[rejected]}) has no unused match. Leave it grey and select another tile.` :
+    checked && missed.length ? `You missed ${missed.length} matching ${missed.length === 1 ? 'clue' : 'clues'} at ${missed.length === 1 ? 'position' : 'positions'} ${missed.map(i => i + 1).join(', ')}. Select them, then check again.` : ''
+  const select = (index: number) => {
+    if (expected[index] === 'miss') { setRejected(index); return }
+    setRejected(null)
+    setMarks(old => old.map((mark, i) => i === index ? mark === 'miss' ? expected[i] : 'miss' : mark))
+  }
+  const send = () => {
+    setRejected(null)
+    setChecked(true)
+    if (missed.length) return
+    void controller.mutate('submit_hints', { p_guess_id: pending.id, p_marks: marks })
+  }
+  return <div className="hint-editor"><span className="hint-label">Your secret · for your eyes only</span><Tiles mode={game.room.mode} value={game.own_secret} length={MODES[game.room.mode].length} /><p>Tap the letters or digits that match your secret. The game picks green or yellow automatically.</p>
     <Legend />
-    <div className={`manual-hints tiles-${MODES[game.room.mode].length}`} aria-label="Mark clues">{[...pending.guess].map((item, i) => <button key={i} className={`tile ${marks[i]}`} aria-label={`Clue ${i + 1}: ${item}`} aria-description={CLUES[marks[i]].label} disabled={controller.busy} onClick={() => setMarks(old => old.map((mark, j) => i === j ? mark === 'miss' ? 'present' : mark === 'present' ? 'hit' : 'miss' : mark))}>{item}<small aria-hidden="true">{CLUES[marks[i]].symbol}</small></button>)}</div>
-    <p className="hint-check-note">Green matches first. Only use each matching letter or digit once.</p>
-    <button className="button primary full" disabled={controller.busy || controller.connection === 'offline'} onClick={() => { void controller.mutate('submit_hints', { p_guess_id: pending.id, p_marks: marks }) }}>Check & send hints <CheckCheck size={17} /></button>
+    <div className={`manual-hints tiles-${MODES[game.room.mode].length}`} aria-label="Mark clues" aria-describedby={error ? errorId : undefined}>{[...pending.guess].map((item, i) => <button key={i} className={`tile ${marks[i]}`} aria-label={`Clue ${i + 1}: ${item}`} aria-description={marks[i] === 'miss' ? 'Not selected. Tap to check this tile.' : `${CLUES[marks[i]].label}. Tap again to deselect.`} aria-pressed={marks[i] !== 'miss'} aria-invalid={rejected === i || checked && missed.includes(i)} disabled={controller.busy} onClick={() => select(i)}>{item}<small aria-hidden="true">{CLUES[marks[i]].symbol}</small></button>)}</div>
+    <p className="hint-check-note">Leave non-matches grey. Each copy in your secret can match once; green positions count first. Tap a selected tile again to undo.</p>
+    {error && <p className="field-error" role="alert" id={errorId}>{error}</p>}
+    <button className="button primary full" disabled={controller.busy || controller.connection === 'offline'} onClick={send}>Check & send hints <CheckCheck size={17} /></button>
   </div>
 }
 
@@ -174,5 +200,5 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 function Rules({ mode, turns, onClose }: { mode: Mode; turns: boolean; onClose: () => void }) {
-  return <Modal title={`How to play ${MODES[mode].name}`} onClose={onClose}><p>Choose and lock your secrets first. The bets screen opens automatically: write your bets, both agree, then the host starts there. {MODES[mode].description}</p><Legend /><p>Use the colours to find your friend’s secret. Repeated letters and digits only count as many times as they appear.</p><p>{turns ? 'One guess each, taking turns until someone wins. Your friend marks the clues, and the game checks them. The starting player swaps each round. There is no timer.' : 'Both players guess together. The timer shows how long you have been playing; there is no deadline.'}</p><p>Unlimited guesses. The first exact answer stops both players and reveals both secrets. Both choose to continue before picking new secrets. Best of three rounds; bets are agreed once per match.</p><button className="button primary full" onClick={onClose}>Got it <Check size={17} /></button></Modal>
+  return <Modal title={`How to play ${MODES[mode].name}`} onClose={onClose}><p>Choose and lock your secrets first. The bets screen opens automatically: write your bets, both agree, then the host starts there. {MODES[mode].description}</p><Legend /><p>Use the colours to find your friend’s secret. Repeated letters and digits only count as many times as they appear.</p><p>{turns ? 'One guess each, taking turns until someone wins. Tap matching tiles in your friend’s guess: the game picks green or yellow. Check & send hints flags missed matches before the server verifies and shares the clues. The starting player swaps each round. There is no timer.' : 'Both players guess together. The timer shows how long you have been playing; there is no deadline.'}</p><p>Unlimited guesses. The first exact answer stops both players and reveals both secrets. Both choose to continue before picking new secrets. Best of three rounds; bets are agreed once per match.</p><button className="button primary full" onClick={onClose}>Got it <Check size={17} /></button></Modal>
 }

@@ -14,6 +14,7 @@ const RPCS = {
   advance_round: ['p_room', 'p_match', 'p_round'],
   heartbeat: ['p_room'],
   get_game_state: ['p_room'],
+  get_bet_history: ['p_before', 'p_before_id', 'p_search', 'p_result'],
 } satisfies Record<string, string[]>
 
 class RequestError extends Error {

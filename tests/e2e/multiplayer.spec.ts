@@ -1,10 +1,10 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test'
 import type { PGlite } from '@electric-sql/pglite'
-import { asUser, createDatabase, user } from '../database'
+import { asUser, call, createDatabase, roomPair as backendPair, start as startGame, user } from '../database'
 
 // Test-only transport backed by the actual migrations, roles and RPCs.
-async function connect(context: BrowserContext, db: PGlite) {
-  const id = await user(db)
+async function connect(context: BrowserContext, db: PGlite, anonymous = true, existingId?: string) {
+  const id = existingId ?? await user(db)
   const token = [
     Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url'),
     Buffer.from(JSON.stringify({ sub: id, aud: 'authenticated', role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url'),
@@ -16,14 +16,14 @@ async function connect(context: BrowserContext, db: PGlite) {
     try {
       let result: unknown
       if (url.pathname.startsWith('/auth/')) {
-        result = { access_token: token, refresh_token: 'test-refresh', token_type: 'bearer', expires_in: 3600, user: { id, aud: 'authenticated', role: 'authenticated', is_anonymous: true, created_at: new Date().toISOString(), app_metadata: {}, user_metadata: {} } }
+        result = { access_token: token, refresh_token: 'test-refresh', token_type: 'bearer', expires_in: 3600, user: { id, aud: 'authenticated', role: 'authenticated', is_anonymous: anonymous, created_at: new Date().toISOString(), app_metadata: {}, user_metadata: {} } }
       } else if (url.pathname === '/rest/v1/word_bank') {
         const offset = Number(url.searchParams.get('offset') ?? 0)
         const limit = Number(url.searchParams.get('limit') ?? 1000)
         result = (await asUser<{ word: string }>(db, id, 'select word from public.word_bank order by word limit $1 offset $2', [limit, offset])).rows
       } else if (url.pathname.startsWith('/rest/v1/rpc/')) {
         const fn = url.pathname.split('/').at(-1)!
-        if (!['create_room', 'join_room', 'set_wager', 'set_ready', 'set_secret', 'start_round', 'submit_guess', 'submit_hints', 'advance_round', 'heartbeat', 'get_game_state'].includes(fn)) throw new Error('Unknown RPC')
+        if (!['create_room', 'join_room', 'set_wager', 'set_ready', 'set_secret', 'start_round', 'submit_guess', 'submit_hints', 'advance_round', 'heartbeat', 'get_game_state', 'get_bet_history'].includes(fn)) throw new Error('Unknown RPC')
         const entries = Object.entries(request.postDataJSON() ?? {})
         if (entries.some(([key]) => !/^p_[a-z_]+$/.test(key))) throw new Error('Invalid argument')
         const sql = `select public.${fn}(${entries.map(([key], i) => `${key} => $${i + 1}`).join(',')}) as result`
@@ -122,7 +122,7 @@ for (const mode of ['Number Lock', 'Word Lock']) test(`random secret selection s
     if (mode === 'Word Lock') {
       await input.fill('XXXXXX')
       await a.getByRole('button', { name: 'Lock my secret' }).click()
-      await expect(a.getByRole('alert')).toContainText('dictionary')
+      await expect(a.getByRole('alert')).toContainText('real six-letter word')
       await expect(a.getByRole('tab', { name: 'My secret', exact: true })).toHaveAttribute('aria-selected', 'true')
       await expect(a.getByLabel('Match bets', { exact: true })).toHaveCount(0)
     }
@@ -156,6 +156,79 @@ for (const mode of ['Number Lock', 'Word Lock']) test(`random secret selection s
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     }
   } finally { await Promise.all(contexts.map(c => c.close())); await db.close() }
+})
+
+test('pastel and dark themes persist and the private player panel explains Google setup', async ({ browser }) => {
+  const db = await createDatabase()
+  const context = await browser.newContext({ viewport: { width: 320, height: 844 }, isMobile: true, hasTouch: true })
+  try {
+    await connect(context, db)
+    const page = await context.newPage()
+    await page.goto('/')
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'pastel')
+    await expect(page.getByRole('button', { name: 'Use pastel theme', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('button', { name: 'Use dark theme', exact: true }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await page.reload()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await page.getByRole('button', { name: 'Use pastel theme', exact: true }).click()
+    await page.reload()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'pastel')
+    await page.getByRole('button', { name: 'Player account and bet history', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Your player & bets', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Sign in with Google', exact: true })).toBeDisabled()
+    await expect(page.getByText('Google sign-in is not configured yet. Guest play and private history still work.', { exact: true })).toBeVisible()
+    await expect(page.getByText('No completed matches match this filter yet.', { exact: true })).toBeVisible()
+    await context.route('**/rest/v1/rpc/get_bet_history', route => route.fulfill({ status: 503, json: { message: 'History temporarily unavailable.' } }))
+    await page.getByRole('button', { name: 'Refresh bet history', exact: true }).click()
+    await expect(page.getByRole('alert')).toHaveText('History temporarily unavailable.')
+    await expect(page.getByText('No completed matches match this filter yet.', { exact: true })).toHaveCount(0)
+    await context.unroute('**/rest/v1/rpc/get_bet_history')
+    await page.getByRole('button', { name: 'Refresh bet history', exact: true }).click()
+    await expect(page.getByText('No completed matches match this filter yet.', { exact: true })).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  } finally { await context.close(); await db.close() }
+})
+
+test('account-backed history follows the same signed-in identity across isolated sessions', async ({ browser }) => {
+  const db = await createDatabase()
+  const pair = await backendPair(db)
+  for (let round = 1; round <= 2; round++) {
+    await startGame(db, pair)
+    await call(db, pair.a, 'submit_guess', [pair.room, '3344', 1])
+    if (round === 1) for (const id of [pair.a, pair.b]) await call(db, id, 'advance_round', [pair.room])
+  }
+  const contexts = await Promise.all([0, 1, 2].map(() => browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })))
+  try {
+    for (const [index, context] of contexts.entries()) {
+      await connect(context, db, false, index < 2 ? pair.a : undefined)
+      const page = await context.newPage()
+      await page.goto('/')
+      await page.getByRole('button', { name: 'Player account and bet history', exact: true }).click()
+      await expect(page.getByRole('heading', { name: 'Account connected', exact: true })).toBeVisible()
+      if (index < 2) {
+        await expect(page.locator('.bet-history-card')).toHaveCount(1)
+        await expect(page.locator('.bet-history-card')).toContainText('You won against Bob')
+        await expect(page.locator('.bet-history-card blockquote')).toHaveText('You make me a coffee.')
+      } else {
+        await page.getByLabel('Bet history result', { exact: true }).selectOption('all')
+        await expect(page.getByText('No completed matches match this filter yet.', { exact: true })).toBeVisible()
+      }
+    }
+  } finally { await Promise.all(contexts.map(context => context.close())); await db.close() }
+})
+
+test('cancelled Google redirects display an explicit error rather than a successful sign-in', async ({ browser }) => {
+  const db = await createDatabase()
+  const context = await browser.newContext()
+  try {
+    await connect(context, db)
+    const page = await context.newPage()
+    for (const separator of ['?', '#']) {
+      await page.goto(`/${separator}error=access_denied&error_description=Google%20login%20cancelled`)
+      await expect(page.getByRole('alert')).toContainText('Google login cancelled')
+    }
+  } finally { await context.close(); await db.close() }
 })
 
 test('isolated iPhone sessions agree bets, race simultaneously for three rounds, and rematch', async ({ browser }) => {
@@ -218,7 +291,7 @@ test('Word Lock validates real words and supports virtual-key races', async ({ b
       await launchRound(a, b, 'LETTER', 'SECRET')
         await a.getByLabel('Your guess', { exact: true }).fill('XXXXXX')
         await a.getByRole('button', { name: 'Try word' }).click()
-        await expect(a.getByRole('alert')).toHaveText("That word is not in this game's dictionary. Try another six-letter word.")
+        await expect(a.getByRole('alert')).toContainText('real six-letter word')
         await a.getByLabel('Your guess', { exact: true }).fill('')
       for (const char of 'STREET') await a.getByRole('button', { name: char, exact: true }).click()
       await a.getByRole('button', { name: /^Try (code|word)$/ }).click()
@@ -229,12 +302,16 @@ test('Word Lock validates real words and supports virtual-key races', async ({ b
       await expect(a.getByRole('button', { name: 'T', exact: true })).toHaveClass('key hit')
       await expect(a.getByRole('button', { name: 'R', exact: true })).toHaveClass('key present')
       await expect(a.getByRole('button', { name: 'E', exact: true })).toHaveClass('key hit')
+      await guess(a, 'NORMAL')
+      await guess(a, 'FRUITS')
+      await guess(a, 'APPLES')
+      await expect(a.locator('.history-row')).toHaveCount(4)
       await guess(a, 'LETTER')
       await expect(a.locator('.history-row').last().locator('.tile')).toHaveClass([
         'tile miss filled', 'tile hit filled', 'tile present filled', 'tile miss filled', 'tile hit filled', 'tile present filled',
       ])
       await expect(a.getByRole('button', { name: 'T', exact: true })).toHaveClass('key hit')
-      for (let attempt = 3; attempt <= 10; attempt++) await guess(a, 'STREET')
+      for (let attempt = 6; attempt <= 10; attempt++) await guess(a, 'STREET')
       await expect(a.locator('.history-row')).toHaveCount(10)
       await expect(a.getByLabel('Your guess', { exact: true })).toBeVisible()
       await expect(a.locator('.progress-line')).toContainText('Your guesses: 10')
@@ -246,12 +323,14 @@ test('Word Lock validates real words and supports virtual-key races', async ({ b
     } finally { await Promise.all(contexts.map(c => c.close())); await db.close() }
 })
 
-test('turn-by-turn Word Lock rejects false manual hints, recovers pending guesses and alternates play', async ({ browser }) => {
+test('turn-by-turn Word Lock auto-colours selections, catches missed clues and alternates play', async ({ browser }) => {
   const db = await createDatabase()
   const contexts = await Promise.all([0, 1].map(() => browser.newContext({ viewport: { width: 320, height: 900 }, isMobile: true, hasTouch: true })))
   try {
     const [a, b] = await createPair(contexts, db, 'Word Lock', 'Take turns')
     await launchRound(a, b, 'LETTER', 'SECRET', true)
+    let hintRequests = 0
+    b.on('request', request => { if (request.url().endsWith('/rpc/submit_hints')) hintRequests++ })
     await expect(a.getByLabel('Elapsed time')).toHaveCount(0)
     await expect(b.getByLabel('Your guess', { exact: true })).toHaveCount(0)
     await guess(a, 'STREET')
@@ -259,19 +338,35 @@ test('turn-by-turn Word Lock rejects false manual hints, recovers pending guesse
     await b.reload()
     await expect(b.getByLabel('Mark clues')).toBeVisible()
     await b.getByRole('button', { name: 'Check & send hints' }).click()
-    await expect(b.getByRole('alert')).toContainText('Those hints do not match your secret')
+    await expect(b.getByRole('alert')).toContainText('You missed 5 matching clues at positions 1, 3, 4, 5, 6')
+    await expect(b.getByLabel('Mark clues').locator('[aria-invalid="true"]')).toHaveCount(5)
+    expect(hintRequests).toBe(0)
     await expect(a.locator('.history-row')).toHaveCount(0)
-    for (const [index, letter, clicks] of [[1, 'S', 2], [3, 'R', 1], [4, 'E', 1], [5, 'E', 2], [6, 'T', 2]] as const) {
-      for (let i = 0; i < clicks; i++) await b.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true }).click()
+    await b.getByRole('button', { name: 'Clue 2: T', exact: true }).click()
+    await expect(b.getByRole('alert')).toContainText('Position 2 (T) has no unused match')
+    await expect(b.getByRole('button', { name: 'Clue 2: T', exact: true })).toHaveClass('tile miss')
+    await expect(b.getByRole('button', { name: 'Clue 2: T', exact: true })).toHaveAttribute('aria-pressed', 'false')
+    for (const [index, letter, mark] of [[4, 'E', 'present'], [6, 'T', 'hit'], [1, 'S', 'hit'], [3, 'R', 'present'], [5, 'E', 'hit']] as const) {
+      const tile = b.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true })
+      await tile.click()
+      await expect(tile).toHaveClass(`tile ${mark}`)
+      await expect(tile).toHaveAttribute('aria-pressed', 'true')
     }
+    await b.getByRole('button', { name: 'Clue 5: E', exact: true }).click()
+    await b.getByRole('button', { name: 'Check & send hints' }).click()
+    await expect(b.getByRole('alert')).toContainText('You missed 1 matching clue at position 5')
+    expect(hintRequests).toBe(0)
+    await b.getByRole('button', { name: 'Clue 5: E', exact: true }).click()
+    await expect(b.getByRole('alert')).toHaveCount(0)
     await b.getByRole('button', { name: 'Check & send hints' }).click()
     await expect(b.getByLabel('Your guess', { exact: true })).toBeVisible()
+    expect(hintRequests).toBe(1)
     await expect(a.getByLabel('Guess history').getByLabel('E, correct position', { exact: true })).toHaveCount(1)
     await expect(a.getByLabel('Guess history').getByLabel('E, wrong position', { exact: true })).toHaveCount(1)
     await guess(b, 'BETTER')
     await expect(a.getByLabel('Mark clues')).toBeVisible()
-    for (const [index, letter, clicks] of [[2, 'E', 2], [3, 'T', 2], [4, 'T', 2], [5, 'E', 2], [6, 'R', 2]] as const) {
-      for (let i = 0; i < clicks; i++) await a.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true }).click()
+    for (const [index, letter] of [[2, 'E'], [3, 'T'], [4, 'T'], [5, 'E'], [6, 'R']] as const) {
+      await a.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true }).click()
     }
     await a.getByRole('button', { name: 'Check & send hints' }).click()
     await expect(a.getByLabel('Your guess', { exact: true })).toBeVisible()
@@ -279,6 +374,37 @@ test('turn-by-turn Word Lock rejects false manual hints, recovers pending guesse
     for (const page of [a, b]) {
       await expect(page.getByText('ROUND 1 COMPLETE', { exact: true })).toBeVisible()
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    }
+  } finally { await Promise.all(contexts.map(c => c.close())); await db.close() }
+})
+
+test('turn-by-turn Number Lock accepts all-grey clues and rejects exhausted duplicate selections', async ({ browser }) => {
+  const db = await createDatabase()
+  const contexts = await Promise.all([0, 1].map(() => browser.newContext({ viewport: { width: 320, height: 844 }, isMobile: true, hasTouch: true })))
+  try {
+    const [a, b] = await createPair(contexts, db, 'Number Lock', 'Take turns')
+    await launchRound(a, b, '1112', '2211', true)
+    await guess(a, '0000')
+    await expect(b.getByLabel('Mark clues')).toBeVisible()
+    await b.getByRole('button', { name: 'Check & send hints' }).click()
+    await expect(b.getByLabel('Your guess', { exact: true })).toBeVisible()
+    await expect(a.locator('.history-row .tile')).toHaveClass(Array(4).fill('tile miss filled'))
+    await guess(b, '1111')
+    await expect(a.getByLabel('Mark clues')).toBeVisible()
+    await a.getByRole('button', { name: 'Clue 4: 1', exact: true }).click()
+    await expect(a.getByRole('alert')).toContainText('Position 4 (1) has no unused match')
+    for (const index of [3, 1, 2]) {
+      const tile = a.getByRole('button', { name: `Clue ${index}: 1`, exact: true })
+      await tile.click()
+      await expect(tile).toHaveClass('tile hit')
+    }
+    await a.getByRole('button', { name: 'Check & send hints' }).click()
+    await expect(a.getByLabel('Your guess', { exact: true })).toBeVisible()
+    await expect(b.locator('.history-row .tile')).toHaveClass(['tile hit filled', 'tile hit filled', 'tile hit filled', 'tile miss filled'])
+    await guess(a, '2211')
+    for (const page of [a, b]) {
+      await expect(page.getByText('ROUND 1 COMPLETE', { exact: true })).toBeVisible()
+      await expect(page.getByLabel('Your guess', { exact: true })).toHaveCount(0)
     }
   } finally { await Promise.all(contexts.map(c => c.close())); await db.close() }
 })

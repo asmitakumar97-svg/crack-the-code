@@ -53,7 +53,7 @@ export function SetupFlow({ controller, mode, setMode, variant, setVariant }: { 
       </div>
       <ol className="how-to-play" aria-label={`${MODES[mode].name} instructions`}>
         <li><span>1</span><p>{mode === 'word' ? 'Pick a secret six-letter word.' : 'Pick a secret four-digit code.'}<small>Then write your bets, agree and start.</small></p></li>
-        <li><span>2</span><p>{variant === 'turns' ? 'Take one guess each. Help mark your friend’s clues.' : 'Guess together and follow the colours.'}<small>Green: right place. Yellow: wrong place. Grey: no match.</small></p></li>
+        <li><span>2</span><p>{variant === 'turns' ? 'Take one guess each. Tap matching clues; the game picks the colours.' : 'Guess together and follow the colours.'}<small>Green: right place. Yellow: wrong place. Grey: no match.</small></p></li>
         <li><span>3</span><p>First to crack the code wins.<small>Unlimited guesses. Best of three rounds.</small></p></li>
       </ol>
       <button className="button primary full" onClick={() => next(3)}>Next · your room <ArrowRight size={18} /></button>

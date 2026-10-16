@@ -62,6 +62,19 @@ export interface GameState {
   results: RoundResult[]
   server_now: string
 }
+export interface BetRecord {
+  id: string
+  completed_at: string
+  mode: Mode
+  variant: Variant
+  opponent_id: string
+  opponent_name: string
+  won: boolean
+  draw: boolean
+  bet: string
+  your_score: number
+  opponent_score: number
+}
 export function displayItem(_mode: Mode, value: string) {
   return value
 }
@@ -70,11 +83,27 @@ export function formatTime(seconds: number) {
   if (safe >= 3600) return `${Math.floor(safe / 3600)}:${Math.floor(safe % 3600 / 60).toString().padStart(2, '0')}:${(safe % 60).toString().padStart(2, '0')}`
   return `${Math.floor(safe / 60).toString().padStart(2, '0')}:${(safe % 60).toString().padStart(2, '0')}`
 }
-export function validateEntry(mode: Mode, value: string, words: string[]): string | null {
+export function validateEntry(mode: Mode, value: string): string | null {
   if (value.length !== MODES[mode].length) return `Enter exactly ${MODES[mode].length} ${mode === 'word' ? 'letters' : 'digits'}.`
   if (![...value].every(c => MODES[mode].keys.includes(c))) return 'That code contains an unavailable character.'
-  if (mode === 'word' && !words.includes(value)) return "That word is not in this game's dictionary. Try another six-letter word."
   return null
+}
+
+export function getFeedback(secret: string, guess: string): Mark[] {
+  if (!secret.length || secret.length !== guess.length) throw new Error('The secret and guess must have the same nonzero length.')
+  const remaining = new Map<string, number>()
+  const marks: Mark[] = [...guess].map((item, i) => {
+    if (item === secret[i]) return 'hit'
+    remaining.set(secret[i], (remaining.get(secret[i]) ?? 0) + 1)
+    return 'miss'
+  })
+  return marks.map((mark, i) => {
+    if (mark === 'hit') return mark
+    const copies = remaining.get(guess[i]) ?? 0
+    if (!copies) return 'miss'
+    remaining.set(guess[i], copies - 1)
+    return 'present'
+  })
 }
 
 export function generateSecret(mode: Mode, words: string[]): string {

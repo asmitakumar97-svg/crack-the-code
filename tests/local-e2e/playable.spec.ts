@@ -87,8 +87,8 @@ for (const mode of ['Number Lock', 'Word Lock']) test(`real local ${mode} create
   } finally { await Promise.all(contexts.map(context => context.close())) }
 })
 
-test('real local turns reject false hints and enforce alternating play', async ({ browser }) => {
-  const contexts = await Promise.all([0, 1].map(() => browser.newContext({ viewport: { width: 1280, height: 900 } })))
+test('real local turns auto-colour selected clues and block missed matches before sending', async ({ browser }) => {
+  const contexts = await Promise.all([320, 390].map(width => browser.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true })))
   try {
     const [a, b] = await Promise.all(contexts.map(context => context.newPage()))
     await roomPair(a, b, 'Word Lock', true)
@@ -103,14 +103,18 @@ test('real local turns reject false hints and enforce alternating play', async (
     await expect(b.getByLabel('Mark clues')).toBeVisible()
     await expect(b.getByRole('group', { name: 'Your word', exact: true }).locator('.tile')).toHaveText([...'SECRET'])
     await b.getByRole('button', { name: 'Check & send hints' }).click()
-    await expect(b.getByRole('alert')).toContainText('Those hints do not match your secret')
+    await expect(b.getByRole('alert')).toContainText('You missed 5 matching clues at positions 1, 3, 4, 5, 6')
     await expect(a.locator('.history-row')).toHaveCount(0)
     await b.reload()
     await expect(b.getByLabel('Mark clues')).toBeVisible()
     await expect(b.getByRole('group', { name: 'Your word', exact: true }).locator('.tile')).toHaveText([...'SECRET'])
-    for (const [index, letter, clicks] of [[1, 'S', 2], [3, 'R', 1], [4, 'E', 1], [5, 'E', 2], [6, 'T', 2]] as const) {
-      for (let i = 0; i < clicks; i++) await b.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true }).click()
+    await b.getByRole('button', { name: 'Clue 2: T', exact: true }).click()
+    await expect(b.getByRole('alert')).toContainText('has no unused match')
+    for (const [index, letter] of [[1, 'S'], [3, 'R'], [4, 'E'], [5, 'E'], [6, 'T']] as const) {
+      await b.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true }).click()
     }
+    await expect(b.getByLabel('Mark clues').locator('.tile')).toHaveClass(['tile hit', 'tile miss', 'tile present', 'tile present', 'tile hit', 'tile hit'])
+    for (const page of [a, b]) expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
     await b.getByRole('button', { name: 'Check & send hints' }).click()
     await expect(b.getByLabel('Your guess', { exact: true })).toBeVisible()
     await expect(a.getByLabel('Guess history').getByLabel('E, correct position', { exact: true })).toHaveCount(1)
@@ -121,5 +125,51 @@ test('real local turns reject false hints and enforce alternating play', async (
     await expect(b.getByRole('heading', { name: 'You cracked it first!' })).toBeVisible()
     await expect(a.getByRole('heading', { name: 'Bob cracked it first!' })).toBeVisible()
     await expect(b.getByLabel('Elapsed time')).toHaveCount(0)
+  } finally { await Promise.all(contexts.map(context => context.close())) }
+})
+
+test('real local completed bets remain private and visible after rematch in either theme', async ({ browser }) => {
+  const contexts = await Promise.all([320, 390, 360].map(width => browser.newContext({ viewport: { width, height: 844 }, isMobile: true, hasTouch: true })))
+  try {
+    const [a, b, outsider] = await Promise.all(contexts.map(context => context.newPage()))
+    await roomPair(a, b)
+    for (let round = 1; round <= 2; round++) {
+      for (const [index, page] of [a, b].entries()) {
+        await page.getByLabel('Your secret code', { exact: true }).fill(index === 0 ? '1112' : '3344')
+        await page.getByRole('button', { name: 'Lock my secret', exact: true }).click()
+      }
+      if (round === 1) await start(a, b)
+      else {
+        await a.getByRole('button', { name: 'Start round', exact: true }).click()
+        await expect(a.getByLabel('Your guess', { exact: true })).toBeVisible()
+      }
+      await a.getByLabel('Your guess', { exact: true }).fill('3344')
+      await a.getByRole('button', { name: 'Try code', exact: true }).click()
+      if (round === 1) for (const page of [a, b]) await page.getByRole('button', { name: 'Ready for round 2', exact: true }).click()
+    }
+    await expect(a.getByRole('heading', { name: 'You win the match!', exact: true })).toBeVisible()
+    await b.getByRole('button', { name: 'Use dark theme', exact: true }).click()
+    for (const [index, page] of [a, b].entries()) {
+      await page.getByRole('button', { name: 'Player account and bet history', exact: true }).click()
+      await expect(page.getByText('Google accounts require the hosted Supabase game, not the local development server.', { exact: true })).toBeVisible()
+      if (index) await page.getByLabel('Bet history result', { exact: true }).selectOption('lost')
+      await expect(page.locator('.bet-history-card')).toHaveCount(1)
+      await expect(page.locator('.bet-history-card')).toContainText(index ? 'You lost against Alice' : 'You won against Bob')
+      await expect(page.locator('.bet-history-card blockquote')).toHaveText('You make me coffee.')
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+      await page.getByRole('button', { name: 'Close dialog', exact: true }).click()
+    }
+    for (const page of [a, b]) await page.getByRole('button', { name: 'New match · new bets', exact: true }).click()
+    await expect(a.getByLabel('Your secret code', { exact: true })).toBeVisible()
+    await a.getByRole('button', { name: 'Player account and bet history', exact: true }).click()
+    await expect(a.locator('.bet-history-card blockquote')).toHaveText('You make me coffee.')
+    await a.getByLabel('Opponent name', { exact: true }).fill('Nobody')
+    await a.getByRole('button', { name: 'Search bets', exact: true }).click()
+    await expect(a.locator('.bet-history-card')).toHaveCount(0)
+    await expect(a.getByText('No completed matches match this filter yet.', { exact: true })).toBeVisible()
+    await outsider.goto('/')
+    await outsider.getByRole('button', { name: 'Player account and bet history', exact: true }).click()
+    await outsider.getByLabel('Bet history result', { exact: true }).selectOption('all')
+    await expect(outsider.getByText('No completed matches match this filter yet.', { exact: true })).toBeVisible()
   } finally { await Promise.all(contexts.map(context => context.close())) }
 })
