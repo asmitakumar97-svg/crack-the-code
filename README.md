@@ -45,15 +45,15 @@ For public hosting, follow the Supabase setup below and use `npm run dev`/`npm r
 
 - **Number Lock:** four digits, including leading zeros and repeats.
 - **Word Lock:** real **four-letter words** from a shared, curated word bank.
-- Mint means an item occurs in the secret. Slate means no unmatched copy remains. **No clue reveals whether its position is correct.** Repeated items count only as many times as they occur in the secret, allocated left to right.
-- Only the **exact secret in the exact order** wins. Four mint tiles in a different order do not count as a solve.
+- **Wordle-style clues in both modes:** green/mint means the correct digit or letter in the correct position; yellow means a matching item in the wrong position; grey/slate means no unused matching copy remains. Exact positions are reserved first, then remaining copies are allocated left to right. A grey extra copy does not mean that character is entirely absent.
+- Only the **exact secret in the exact order** wins. Four yellow tiles do not count as a solve. Keyboard colours retain the strongest earned clue: green before yellow before grey.
 - Four screens replace the long landing page: **Name → How to play → Room & secret → Play**.
 - On **screen 3 → Room → My secret**, each player writes their secret using the four tiles and virtual keyboard, then chooses **Lock my secret**. **Choose for me** fills a random four-digit code or a real word from the word bank using the browser's cryptographic random generator. It shows the result privately for review; players can edit or choose again before locking. It never submits automatically, and unlocked drafts stay in that browser only. Word Lock also offers a searchable bank of real four-letter words. These game secrets are not passwords; never reuse a real password.
 - Your own secret is **always visible on your screen** while typing and after locking. A **Your code / Your word** card stays visible during the countdown and gameplay, including while marking hints or waiting for a turn. There is no Show/Hide step. This uses only your authorized `own_secret`; it does not reveal the opponent's answer. Be mindful of people looking at your screen or screen sharing.
 - The guest agrees to the displayed bets and gets ready. **Only the room creator can start each round**, after both secrets are locked. Both see a shared six-second countdown.
 - **Live race:** both players guess simultaneously; a visible timer tracks elapsed time only.
-- **Take turns:** players alternate guesses, with the secret owner manually marking the matching digits/letters. The server verifies the hints before publishing them. There is no elapsed timer on the turns screen. The opening player alternates between the host and guest each round.
-- The **first exact solve accepted by the server wins the round immediately**, even if that player used more guesses. Room locks serialize close finishes into one winner.
+- **Take turns:** players alternate guesses, with the secret owner manually marking green, yellow or grey clues. Tap a tile to cycle grey → yellow → green. The server verifies the hints before publishing them. There is no elapsed timer on the turns screen. The opening player alternates between the host and guest each round.
+- The **first exact solve accepted by the server wins the round immediately**, even if that player used more guesses. Guessing stops for both players and both secrets are revealed. Room locks serialize close finishes into one winner; late guesses cannot change the result. Both players choose **Ready for round N** before setting new secrets, and the host explicitly starts after the guest is ready. There is no automatic next-round timer.
 - Eight guesses per player. If both run out, the round is a draw.
 - Best of three: a player reaching two wins ends the match early. Otherwise the match ends after three rounds. A tied final score draws, with no bet won.
 - **No time limit** and no automatic room expiry. Elapsed time is recorded but never determines the winner. Disconnected players can return with the same browser identity.
@@ -88,11 +88,12 @@ export PATH="/opt/homebrew/bin:$PATH"
 
 1. Create a project at [Supabase](https://supabase.com/dashboard).
 2. Under **Authentication → Sign In / Providers**, enable **Anonymous Sign-Ins**.
-3. Open **SQL Editor** and run all three migrations **in this order**:
+3. Open **SQL Editor** and run all four migrations **in this order**:
    - [`202610160001_game.sql`](./supabase/migrations/202610160001_game.sql)
    - [`202610160002_race_bets.sql`](./supabase/migrations/202610160002_race_bets.sql)
    - [`202610160003_host_turns.sql`](./supabase/migrations/202610160003_host_turns.sql)
-4. Only run migrations you have not applied yet. Existing installations with the first two need **only the third**. Rule-changing migrations intentionally reset existing rooms to preparation with a fresh match; historical rows are retained. Migration three removes Symbol Cipher, adds host-started rounds and manual turns.
+   - [`202610160004_wordle_feedback.sql`](./supabase/migrations/202610160004_wordle_feedback.sql)
+4. Only run migrations you have not applied yet. Existing installations with the first three need **only the fourth**, run as one complete query. Migrations two and three intentionally restart matches; migration four preserves rooms, scores, secrets and pending turns while recalculating saved feedback with Wordle rules. It changes no RLS policies or client permissions. Apply it before deploying the updated frontend, then refresh both players' open game pages so the colours and manual-hint controls match the new rules.
 5. Verify **Database → Publications → supabase_realtime** contains `rooms` only for this app. Do **not** publish `secrets` or `guesses`.
 6. Copy your project URL and **publishable key** (or legacy public `anon` key). Never use a secret/service-role key in the browser.
 
@@ -134,21 +135,21 @@ Open Vite's printed address, usually `http://localhost:5173`. Restart after chan
 3. In the second browser, enter another name, continue through How to play, then select **Join room** and enter the room code. Invite links preselect joining. The actual host's mode, play style and stakes replace any local tutorial selection.
 4. The guest writes their bet, such as “You bring me a snack,” and selects **Save bet & choose secret**. The creator's bet, such as “You make me a coffee,” was saved at creation.
 5. Player A privately enters and locks `1122`; player B enters and locks `3344`. Review the displayed bets. The guest chooses **Agree to bets & ready**, then the host chooses **Agree & start game**. Neither can guess before this or before the shared countdown completes. In Live race both now guess simultaneously, with elapsed time visible.
-6. A guesses `3333`: exactly the **first two tiles are mint**, the remaining two are slate. This indicates two copies, not correct positions.
-7. A guesses `4433`: all four tiles are mint, but the round must continue because order is wrong.
+6. A guesses `3333`: exactly the **first two tiles are green**, the remaining two are grey. The two correctly positioned copies consume both `3`s in the secret.
+7. A guesses `4433`: all four tiles are yellow, and the round continues because every item is in the wrong position.
 8. A guesses `3344` first: the round ends immediately in both windows, A gets one point, and the winner screen reveals both secrets. B cannot submit a later winning guess.
-9. Both continue. Lock new secrets, get the guest ready, and let the host start each next round. Try B winning round two, then A winning round three: A wins the match, and A's written bet appears. Alternatively A wins rounds one and two: no third round is needed.
+9. A selects **Ready for round 2**; both stay on the reveal screen until B also chooses it. Lock new secrets, get the guest ready, and let the host start each next round. Try B winning round two, then A winning round three: A wins the match, and A's written bet appears. Alternatively A wins rounds one and two: no third round is needed.
 10. Both choose **New match · new bets**. Scores reset and the bet fields are blank. Both must write and agree again.
 11. Reload either browser while guessing: accepted guesses, scores and your locked secret recover. Unsubmitted guesses, unsubmitted secrets and unsaved bet edits deliberately remain private and disappear on reload.
-12. Try Word Lock using `TREE` and `MINT`. `TIME` against `MINT` produces mint/mint/mint/slate, without position clues. Non-words are rejected; use **Word bank** to choose a real word.
+12. Try Word Lock using `TREE` and `MINT`. `TIME` against `MINT` produces yellow/green/yellow/grey. `TEEM` against `TREE` produces green/yellow/green/grey: the correctly positioned `E` is reserved before assigning the other copy. Non-words are rejected; use **Word bank** to choose a real word.
 13. Create another room with **Take turns** and test the checked-hints flow below.
 
 ### Manual hints and anti-cheating
 
 1. Start a Take turns room with A's secret `1122` and B's secret `3344`.
 2. A opens round one and guesses `3333`. The guess leaves A's field and B sees a manual clue screen. A sees **no feedback yet** and cannot submit another guess.
-3. B sees their own secret privately and taps the first two `3` tiles to mark them mint. Choosing **Check & send hints** with all four slate (or any other wrong combination) is rejected by the server; nothing is sent to A.
-4. Correct hints publish to A's history, and it becomes B's guessing turn. A cannot mark their own clues or guess out of turn. Duplicate matches are allocated left to right.
+3. B sees their own secret privately and taps the first two `3` tiles twice each to mark them green (grey → yellow → green). Choosing **Check & send hints** with all four grey (or any other wrong combination) is rejected by the server; nothing is sent to A.
+4. Correct hints publish to A's history, and it becomes B's guessing turn. A cannot mark their own clues or guess out of turn. Mark exact positions green first, then assign remaining matching copies yellow from left to right.
 5. An exact secret match is always resolved by the server immediately, without waiting for the other player to approve the win. A losing player cannot suppress a legitimate win by refusing to send clues.
 6. Reload either browser while hints are pending. The submitted guess recovers; unsent clue selections do not. The secret owner's screen can mark the hints again.
 
@@ -196,7 +197,7 @@ npm run test:e2e
 npm run test:local
 ```
 
-Unit/integration tests run **all three actual migrations** in embedded PostgreSQL (PGlite), with test-only auth/roles. They check all 6,561 four-item feedback pairs against a multiset oracle, absence of positional clues, RLS, host authority, shared start gating, simultaneous solves, validated manual hints, turn order, private pending feedback, best-of-three scoring, bet consent/version checks, attempt limits and rematches.
+Unit/integration tests run **all four actual migrations** in embedded PostgreSQL (PGlite), with test-only auth/roles. They check all 6,561 four-item feedback pairs against an independent position-and-frequency oracle, exact-match priority for duplicates, saved-clue migration without match resets, RLS, host authority, shared start gating, simultaneous solves, validated manual hints, turn order, private pending feedback, best-of-three scoring, bet consent/version checks, attempt limits and rematches. Browser tests verify green/yellow/grey tiles, strongest-clue keyboard colours, both players stopping and seeing both reveals, and waiting for both players before advancing.
 
 Browser tests use two isolated contexts connected to those same real SQL functions through a **test-only transport**. WebSockets are disabled to verify polling recovery. This is not a replacement for testing a real hosted Supabase project: follow the two-person checklist to verify hosted Auth, PostgREST and Realtime.
 

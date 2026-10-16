@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 import { ArrowRight, Delete, LockKeyhole, Search, Shuffle } from 'lucide-react'
 import { MODES, displayItem, generateSecret, validateEntry, type Mark, type Mode, type Guess } from '../lib/game'
-import { Tiles } from './Tiles'
+import { CLUES, Tiles } from './Tiles'
 
 export function CodeEntry({ mode, secret = false, words, busy, onSubmit, guesses = [] }: {
   mode: Mode; secret?: boolean; words: string[]; busy: boolean; onSubmit: (value: string) => Promise<boolean>; guesses?: Guess[]
@@ -31,7 +31,7 @@ export function CodeEntry({ mode, secret = false, words, busy, onSubmit, guesses
     }
   }
   const keyMarks: Record<string, Mark> = {}
-  const priority = { miss: 1, hit: 2 }
+  const priority = { miss: 1, present: 2, hit: 3 }
   for (const guess of guesses) [...guess.guess].forEach((char, i) => {
     const mark = guess.feedback[i]
     if (!keyMarks[char] || priority[mark] > priority[keyMarks[char]]) keyMarks[char] = mark
@@ -61,7 +61,7 @@ export function CodeEntry({ mode, secret = false, words, busy, onSubmit, guesses
     <div className={`keyboard keyboard-${mode}`} aria-label="Virtual keyboard">
       {rows.map(row => <div className="key-row" key={row}>
         {[...row].map(key => <button key={key} type="button" disabled={busy} className={`key ${!secret ? keyMarks[key] ?? '' : ''}`}
-          aria-label={key} onClick={() => add(key)}>{displayItem(mode, key)}</button>)}
+          aria-label={key} aria-description={!secret && keyMarks[key] ? CLUES[keyMarks[key]].label : undefined} onClick={() => add(key)}>{displayItem(mode, key)}</button>)}
       </div>)}
       <div className="keyboard-actions">
         <button className="key backspace" type="button" aria-label="Delete last character" disabled={busy || !value} onClick={() => setValue(old => old.slice(0, -1))}><Delete size={18} /> Delete</button>

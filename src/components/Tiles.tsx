@@ -1,6 +1,12 @@
 import type { CSSProperties } from 'react'
 import { displayItem, type Mark, type Mode } from '../lib/game'
 
+export const CLUES = {
+  hit: { label: 'Correct position', symbol: '✓' },
+  present: { label: 'Wrong position', symbol: '↔' },
+  miss: { label: 'No match', symbol: '−' },
+} satisfies Record<Mark, { label: string; symbol: string }>
+
 export function Tiles({ mode, value, marks, length, concealed = false, animated = false }: {
   mode: Mode; value: string; marks?: Mark[]; length: number; concealed?: boolean; animated?: boolean
 }) {
@@ -9,9 +15,9 @@ export function Tiles({ mode, value, marks, length, concealed = false, animated 
       const item = value[i] ?? ''
       return <span key={i} className={`tile ${marks?.[i] ?? ''} ${item ? 'filled' : ''}`}
         style={{ '--i': i } as CSSProperties}
-        aria-label={item ? `${concealed ? 'hidden' : item}${marks ? `, ${marks[i] === 'hit' ? 'in the code' : 'not in the code'}` : ''}` : 'Empty position'}>
+        aria-label={item ? `${concealed ? 'hidden' : item}${marks ? `, ${CLUES[marks[i]].label.toLowerCase()}` : ''}` : 'Empty position'}>
         {item ? concealed ? '•' : displayItem(mode, item) : '' }
-        {marks && <small aria-hidden="true">{marks[i] === 'hit' ? '✓' : '−'}</small>}
+        {marks && <small aria-hidden="true">{CLUES[marks[i]].symbol}</small>}
       </span>
     })}
   </div>
@@ -19,7 +25,6 @@ export function Tiles({ mode, value, marks, length, concealed = false, animated 
 
 export function Legend() {
   return <div className="legend">
-    <span><i className="hit">✓</i> In the code</span>
-    <span><i className="miss">−</i> Not in the code</span>
+    {(['hit', 'present', 'miss'] as const).map(mark => <span key={mark}><i className={mark} aria-hidden="true">{CLUES[mark].symbol}</i> {CLUES[mark].label}</span>)}
   </div>
 }

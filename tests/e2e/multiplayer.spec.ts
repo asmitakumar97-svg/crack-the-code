@@ -138,8 +138,9 @@ test('isolated iPhone sessions agree bets, race simultaneously for three rounds,
       await expect(a.getByLabel('Elapsed time')).toBeVisible()
       if (round === 1) {
         await guess(a, '3333')
-        await expect(a.getByLabel('Guess history').getByLabel('3, in the code', { exact: true })).toHaveCount(2)
-        await expect(a.getByLabel('Guess history').getByLabel('3, not in the code', { exact: true })).toHaveCount(2)
+        await expect(a.getByLabel('Guess history').getByLabel('3, correct position', { exact: true })).toHaveCount(2)
+        await expect(a.getByLabel('Guess history').getByLabel('3, no match', { exact: true })).toHaveCount(2)
+        await expect(a.getByRole('button', { name: '3', exact: true })).toHaveClass('key hit')
         await b.getByLabel('Your guess', { exact: true }).fill('9999')
         expect((await db.query('select * from public.guesses where user_id=(select user_id from public.players where name=$1)', ['Bob'])).rows).toHaveLength(0)
         await b.reload()
@@ -149,6 +150,10 @@ test('isolated iPhone sessions agree bets, race simultaneously for three rounds,
       const phase = round === 3 ? 'MATCH COMPLETE' : `ROUND ${round} COMPLETE`
       await expect(a.getByText(phase, { exact: true })).toBeVisible()
       await expect(b.getByText(phase, { exact: true })).toBeVisible()
+      for (const page of [a, b]) {
+        await expect(page.getByLabel('Your guess', { exact: true })).toHaveCount(0)
+        await expect(page.locator('.reveal-card .tile')).toHaveText(page === a ? [...'11223344'] : [...'33441122'])
+      }
       if (round === 3) {
         await expect(a.getByRole('heading', { name: 'You win the match!' })).toBeVisible()
         await expect(a.locator('.winning-bet blockquote')).toHaveText('You make me a coffee.')
@@ -157,6 +162,8 @@ test('isolated iPhone sessions agree bets, race simultaneously for three rounds,
       }
       const label = round === 3 ? 'New match · new bets' : `Ready for round ${round + 1}`
       await a.getByRole('button', { name: label }).click()
+      await expect(a.getByRole('button', { name: 'Waiting for your friend…' })).toBeDisabled()
+      await expect(b.getByText(phase, { exact: true })).toBeVisible()
       await b.getByRole('button', { name: label }).click()
     }
     await expect(a.getByRole('heading', { name: 'Your private room.' })).toBeVisible()
@@ -181,6 +188,21 @@ test('Word Lock validates real words and supports virtual-key races', async ({ b
       for (const char of 'TIME') await a.getByRole('button', { name: char, exact: true }).click()
       await a.getByRole('button', { name: /^Try (code|word)$/ }).click()
       await expect(a.locator('.history-row .tile.filled')).toHaveCount(4)
+      await expect(a.locator('.history-row .tile')).toHaveClass([
+        'tile present filled', 'tile hit filled', 'tile present filled', 'tile miss filled',
+      ])
+      await expect(a.getByRole('button', { name: 'T', exact: true })).toHaveClass('key present')
+      await expect(a.getByRole('button', { name: 'I', exact: true })).toHaveClass('key hit')
+      await expect(a.getByRole('button', { name: 'E', exact: true })).toHaveClass('key miss')
+      await guess(a, 'ITEM')
+      await expect(a.locator('.history-row').last().locator('.tile')).toHaveClass([
+        'tile present filled', 'tile present filled', 'tile miss filled', 'tile present filled',
+      ])
+      await expect(a.getByRole('button', { name: 'I', exact: true })).toHaveClass('key hit')
+      await guess(a, 'MILD')
+      await expect(a.getByRole('button', { name: 'M', exact: true })).toHaveClass('key hit')
+      await guess(a, 'TIME')
+      await expect(a.getByRole('button', { name: 'M', exact: true })).toHaveClass('key hit')
       await guess(a, 'MINT')
       await expect(a.getByRole('heading', { name: 'You cracked it first!' })).toBeVisible()
       await expect(b.getByRole('heading', { name: 'Alice cracked it first!' })).toBeVisible()
@@ -203,15 +225,18 @@ test('turn-by-turn Word Lock rejects false manual hints, recovers pending guesse
     await b.getByRole('button', { name: 'Check & send hints' }).click()
     await expect(b.getByRole('alert')).toContainText('Those hints do not match your secret')
     await expect(a.locator('.history-row')).toHaveCount(0)
-    for (const [index, letter] of [[1, 'T'], [2, 'E'], [3, 'E']]) {
-      await b.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true }).click()
+    for (const [index, letter, clicks] of [[1, 'T', 2], [2, 'E', 1], [3, 'E', 2]] as const) {
+      for (let i = 0; i < clicks; i++) await b.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true }).click()
     }
     await b.getByRole('button', { name: 'Check & send hints' }).click()
     await expect(b.getByLabel('Your guess', { exact: true })).toBeVisible()
-    await expect(a.getByLabel('Guess history').getByLabel('E, in the code', { exact: true })).toHaveCount(2)
+    await expect(a.getByLabel('Guess history').getByLabel('E, correct position', { exact: true })).toHaveCount(1)
+    await expect(a.getByLabel('Guess history').getByLabel('E, wrong position', { exact: true })).toHaveCount(1)
     await guess(b, 'TIME')
     await expect(a.getByLabel('Mark clues')).toBeVisible()
-    for (const [index, letter] of [[1, 'T'], [2, 'I'], [3, 'M']]) await a.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true }).click()
+    for (const [index, letter, clicks] of [[1, 'T', 1], [2, 'I', 2], [3, 'M', 1]] as const) {
+      for (let i = 0; i < clicks; i++) await a.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true }).click()
+    }
     await a.getByRole('button', { name: 'Check & send hints' }).click()
     await expect(a.getByLabel('Your guess', { exact: true })).toBeVisible()
     await guess(a, 'TREE')

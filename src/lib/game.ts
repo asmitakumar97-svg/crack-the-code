@@ -1,6 +1,6 @@
 export type Mode = 'number' | 'word'
 export type Variant = 'race' | 'turns'
-export type Mark = 'hit' | 'miss'
+export type Mark = 'hit' | 'present' | 'miss'
 export type Stake = 'low' | 'high'
 export type Phase = 'lobby' | 'setting' | 'playing' | 'round_over' | 'match_over'
 

@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode 
 import { ArrowLeft, ArrowRight, Check, CheckCheck, CircleHelp, Clock3, CodeXml, Copy, Flame, Leaf, LoaderCircle, LockKeyhole, Repeat2, Trophy, Users, WifiOff, X } from 'lucide-react'
 import { useGame } from './hooks/useGame'
 import { formatTime, MODES, type GameState, type Mark, type Mode, type Player, type Variant } from './lib/game'
-import { Legend, Tiles } from './components/Tiles'
+import { CLUES, Legend, Tiles } from './components/Tiles'
 import { CodeEntry } from './components/CodeEntry'
 import { ScreenSteps, SetupFlow } from './components/SetupFlow'
 import { localPlay } from './lib/supabase'
@@ -130,9 +130,10 @@ function Arena({ controller, game, me, opponent, elapsed, onHelp }: { controller
 function HintEditor({ controller, game }: { controller: Controller; game: GameState }) {
   const [marks, setMarks] = useState<Mark[]>(['miss', 'miss', 'miss', 'miss'])
   const pending = game.pending_guess!
-  return <div className="hint-editor"><span className="hint-label">Your secret · for your eyes only</span><Tiles mode={game.room.mode} value={game.own_secret ?? ''} length={4} /><p>Tap each {game.room.mode === 'word' ? 'letter' : 'digit'} in their guess that matches your secret.</p>
-    <div className="manual-hints" aria-label="Mark clues">{[...pending.guess].map((item, i) => <button key={i} className={`tile ${marks[i]}`} aria-label={`Clue ${i + 1}: ${item}`} aria-pressed={marks[i] === 'hit'} disabled={controller.busy} onClick={() => setMarks(old => old.map((mark, j) => i === j ? mark === 'hit' ? 'miss' : 'hit' : mark))}>{item}<small>{marks[i] === 'hit' ? '✓' : '−'}</small></button>)}</div>
-    <p className="hint-check-note">Copies count left to right. Only correct hints can be sent.</p>
+  return <div className="hint-editor"><span className="hint-label">Your secret · for your eyes only</span><Tiles mode={game.room.mode} value={game.own_secret ?? ''} length={4} /><p>Tap each {game.room.mode === 'word' ? 'letter' : 'digit'} to cycle grey → yellow → green.</p>
+    <Legend />
+    <div className="manual-hints" aria-label="Mark clues">{[...pending.guess].map((item, i) => <button key={i} className={`tile ${marks[i]}`} aria-label={`Clue ${i + 1}: ${item}`} aria-description={CLUES[marks[i]].label} disabled={controller.busy} onClick={() => setMarks(old => old.map((mark, j) => i === j ? mark === 'miss' ? 'present' : mark === 'present' ? 'hit' : 'miss' : mark))}>{item}<small aria-hidden="true">{CLUES[marks[i]].symbol}</small></button>)}</div>
+    <p className="hint-check-note">Mark green positions first, then remaining copies yellow from left to right. Only correct hints can be sent.</p>
     <button className="button primary full" disabled={controller.busy || controller.connection === 'offline'} onClick={() => { void controller.mutate('submit_hints', { p_guess_id: pending.id, p_marks: marks }) }}>Check & send hints <CheckCheck size={17} /></button>
   </div>
 }
@@ -151,6 +152,7 @@ function Results({ game, me, opponent, controller }: { game: GameState; me: Play
     <p>{matchOver ? `${me.score} – ${opponent.score}` : winner ? `Round to ${youWon ? 'you' : winner.name}.` : 'Both players used all eight guesses.'}</p>
     {matchOver && <div className="winning-bet"><span>{winner ? `${youWon ? 'Your' : `${winner.name}’s`} winning bet` : 'No bet won this time'}</span>{winner && <blockquote>{winner.wager}</blockquote>}</div>}
     <div className="reveal-grid">{[me, opponent].map(player => <div className="reveal-card" key={player.user_id}><span>{player.user_id === me.user_id ? 'Your secret' : `${player.name}’s secret`}</span><Tiles mode={game.room.mode} value={result.reveals[player.user_id] ?? ''} length={4} animated /></div>)}</div>
+    {!matchOver && <p>Guessing has stopped for both players. Both must be ready before the next round.</p>}
     <button className="button primary full" disabled={controller.busy || me.next_ready} onClick={() => { void controller.mutate('advance_round') }}>{me.next_ready ? <Check size={18} /> : <ArrowRight size={18} />}{me.next_ready ? 'Waiting for your friend…' : matchOver ? 'New match · new bets' : `Ready for round ${game.room.round_number + 1}`}</button>
   </section>
 }
@@ -163,5 +165,5 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 function Rules({ mode, turns, onClose }: { mode: Mode; turns: boolean; onClose: () => void }) {
-  return <Modal title={`How to play ${MODES[mode].name}`} onClose={onClose}><p>{MODES[mode].description} The room creator starts after both secrets are locked and both bets agreed.</p><Legend /><p>Mint means an item is in the secret, not that its position is right. Repeats count only as many times as they appear.</p><p>{turns ? 'Take turns guessing. The secret owner marks the matching items; the server checks every hint before sending it. The first player alternates each round.' : 'Both players guess simultaneously. The visible timer tracks elapsed time only.'}</p><p>Eight guesses, no time limit. The first exact answer wins. Best of three; a tied match means no bet is won. Exact wins are always checked by the server.</p><button className="button primary full" onClick={onClose}>Got it <Check size={17} /></button></Modal>
+  return <Modal title={`How to play ${MODES[mode].name}`} onClose={onClose}><p>{MODES[mode].description} The room creator starts after both secrets are locked and both bets agreed.</p><Legend /><p>Green means the correct item in the correct position. Yellow means it belongs elsewhere. Grey means no unmatched copy remains. Green positions count first; extra matching copies count left to right.</p><p>{turns ? 'Take turns guessing. The secret owner marks the clues; the server checks every hint before sending it. The first player alternates each round.' : 'Both players guess simultaneously. The visible timer tracks elapsed time only.'}</p><p>Eight guesses, no time limit. The first exact answer stops guessing for both players and reveals both secrets. Both choose to continue, lock new secrets, and wait for the host to start the next round. Best of three; a tied match means no bet is won.</p><button className="button primary full" onClick={onClose}>Got it <Check size={17} /></button></Modal>
 }

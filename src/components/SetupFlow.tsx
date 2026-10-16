@@ -55,8 +55,8 @@ export function SetupFlow({ controller, mode, setMode, variant, setVariant }: { 
       </div>
       <ol className="how-to-play" aria-label={`${MODES[mode].name} instructions`}>
         <li><span>1</span><p>{mode === 'word' ? 'Choose a real four-letter secret word.' : 'Choose a secret four-digit code.'}</p></li>
-        <li><span>2</span><p>{variant === 'turns' ? 'Take turns guessing and marking each other’s clues.' : 'Guess at the same time. Mint means an item is in it.'}<small>{variant === 'turns' ? 'The server checks every hint. No position clues.' : 'No position clues. No time limit.'}</small></p></li>
-        <li><span>3</span><p>First exact answer wins. Best of three.</p></li>
+        <li><span>2</span><p>{variant === 'turns' ? 'Take turns guessing and marking each other’s clues.' : 'Guess together. Green: right place. Yellow: wrong place.'}<small>{variant === 'turns' ? 'Green: right place. Yellow: wrong place. Server-checked.' : 'Grey: no match. Repeated items count carefully.'}</small></p></li>
+        <li><span>3</span><p>First exact answer stops both players and reveals both secrets.<small>Both get ready before the next round. Best of three.</small></p></li>
       </ol>
       <button className="button primary full" onClick={() => next(3)}>Next · your room <ArrowRight size={18} /></button>
     </section> : <section className="panel wizard-panel room-setup">
@@ -79,6 +79,6 @@ export function SetupFlow({ controller, mode, setMode, variant, setVariant }: { 
 
 export function Illustration({ mode }: { mode: Mode }) {
   const guess = mode === 'word' ? 'TIME' : '2917'
-  const marks: Mark[] = mode === 'word' ? ['hit', 'hit', 'hit', 'miss'] : ['miss', 'hit', 'hit', 'hit']
+  const marks: Mark[] = mode === 'word' ? ['present', 'hit', 'present', 'miss'] : ['miss', 'present', 'hit', 'present']
   return <div className={`illustration illustration-${mode}`} aria-label={`${MODES[mode].name} example`}><div className="example-secret"><LockKeyhole size={13} /><span>{mode === 'word' ? 'SECRET WORD' : 'SECRET CODE'}</span></div><Tiles mode={mode} value={MODES[mode].sample.join('')} length={4} /><span className="example-arrow">↓</span><Tiles mode={mode} value={guess} marks={marks} length={4} animated /><Legend /></div>
 }

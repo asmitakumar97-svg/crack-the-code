@@ -100,10 +100,13 @@ test('real local turns reject false hints and enforce alternating play', async (
     await b.reload()
     await expect(b.getByLabel('Mark clues')).toBeVisible()
     await expect(b.getByRole('group', { name: 'Your word', exact: true }).locator('.tile')).toHaveText([...'TREE'])
-    for (const [index, letter] of [[1, 'T'], [2, 'E'], [3, 'E']]) await b.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true }).click()
+    for (const [index, letter, clicks] of [[1, 'T', 2], [2, 'E', 1], [3, 'E', 2]] as const) {
+      for (let i = 0; i < clicks; i++) await b.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true }).click()
+    }
     await b.getByRole('button', { name: 'Check & send hints' }).click()
     await expect(b.getByLabel('Your guess', { exact: true })).toBeVisible()
-    await expect(a.getByLabel('Guess history').getByLabel('E, in the code', { exact: true })).toHaveCount(2)
+    await expect(a.getByLabel('Guess history').getByLabel('E, correct position', { exact: true })).toHaveCount(1)
+    await expect(a.getByLabel('Guess history').getByLabel('E, wrong position', { exact: true })).toHaveCount(1)
     await expect(a.getByLabel('Your guess', { exact: true })).toHaveCount(0)
     await b.getByLabel('Your guess', { exact: true }).fill('MINT')
     await b.getByRole('button', { name: 'Try word' }).click()

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { PGlite } from '@electric-sql/pglite'
+import { readFile } from 'node:fs/promises'
 import { asUser, call, createDatabase, launch, roomPair, start, state, user } from './database'
 import { validateEntry } from '../src/lib/game'
 
@@ -7,20 +8,24 @@ let db: PGlite
 beforeAll(async () => { db = await createDatabase() })
 afterAll(async () => { await db?.close() })
 
-describe('non-positional, duplicate-safe feedback', () => {
+describe('Wordle-style, duplicate-safe feedback', () => {
   it.each([
     ['1122', '1111', ['hit', 'hit', 'miss', 'miss']],
-    ['1122', '2211', ['hit', 'hit', 'hit', 'hit']],
-    ['1234', '4444', ['hit', 'miss', 'miss', 'miss']],
-    ['MINT', 'TIME', ['hit', 'hit', 'hit', 'miss']],
-    ['AABB', 'ABAA', ['hit', 'hit', 'hit', 'miss']],
+    ['1122', '2211', ['present', 'present', 'present', 'present']],
+    ['1234', '4444', ['miss', 'miss', 'miss', 'hit']],
+    ['MINT', 'TIME', ['present', 'hit', 'present', 'miss']],
+    ['AABB', 'ABAA', ['hit', 'present', 'present', 'miss']],
     ['0000', '0000', ['hit', 'hit', 'hit', 'hit']],
-    ['TREE', 'EELS', ['hit', 'hit', 'miss', 'miss']],
-  ])('scores secret %s / guess %s without position clues', async (secret, guess, expected) => {
+    ['TREE', 'EELS', ['present', 'present', 'miss', 'miss']],
+    ['TREE', 'TEEM', ['hit', 'present', 'hit', 'miss']],
+    ['1211', '1111', ['hit', 'miss', 'hit', 'hit']],
+    ['1123', '0111', ['miss', 'hit', 'present', 'miss']],
+    ['ABBA', 'BAAA', ['present', 'present', 'miss', 'hit']],
+  ])('scores secret %s / guess %s with exact positions reserved first', async (secret, guess, expected) => {
     const result = await db.query<{ marks: string[] }>('select private.feedback($1,$2) as marks', [secret, guess])
     expect(result.rows[0].marks).toEqual(expected)
   })
-  it('matches an independent multiset oracle for all 6,561 four-item pairs', async () => {
+  it('matches an independent position-and-frequency oracle for all 6,561 four-item pairs', async () => {
     const codes = Array.from({ length: 81 }, (_, n) => n.toString(3).padStart(4, '0'))
     const results = await db.query<{ secret: string; guess: string; marks: string[] }>(`
       select secret,guess,private.feedback(secret,guess) as marks
@@ -28,12 +33,32 @@ describe('non-positional, duplicate-safe feedback', () => {
     `, [codes])
     for (const { secret, guess, marks } of results.rows) {
       const matches = [...'012'].reduce((sum, c) => sum + Math.min([...secret].filter(x => x === c).length, [...guess].filter(x => x === c).length), 0)
-      expect(marks.filter(m => m === 'hit')).toHaveLength(matches)
-      expect(marks.every(m => m === 'hit' || m === 'miss')).toBe(true)
-      const permuted = [...secret].reverse().join('')
-      const oracle = [...guess].map((char, i) => [...guess.slice(0, i + 1)].filter(c => c === char).length <= [...permuted].filter(c => c === char).length ? 'hit' : 'miss')
+      expect(marks.filter(m => m !== 'miss')).toHaveLength(matches)
+      const exact = [...guess].map((char, i) => char === secret[i])
+      const oracle = [...guess].map((char, i) => {
+        if (exact[i]) return 'hit'
+        const available = [...secret].filter((c, j) => c === char && !exact[j]).length
+        const used = [...guess.slice(0, i + 1)].filter((c, j) => c === char && !exact[j]).length
+        return used <= available ? 'present' : 'miss'
+      })
       expect(marks).toEqual(oracle)
+      expect(marks.every(m => m === 'hit')).toBe(secret === guess)
     }
+  })
+  it('upgrades saved clues without resetting active matches, secrets or scores', async () => {
+    const pair = await roomPair(db)
+    await start(db, pair)
+    await call(db, pair.a, 'submit_guess', [pair.room, '4433', 1])
+    await db.query("update public.guesses set feedback=array['hit','hit','hit','hit'] where room_id=$1", [pair.room])
+    const before = await state(db, pair.a, pair.room)
+    const sql = await readFile(new URL('../supabase/migrations/202610160004_wordle_feedback.sql', import.meta.url), 'utf8')
+    await db.transaction(tx => tx.exec(sql))
+    const after = await state(db, pair.a, pair.room)
+    expect(after.room).toEqual({ ...before.room, version: before.room.version + 1 })
+    expect(after.players).toEqual(before.players)
+    expect(after.own_secret).toBe(before.own_secret)
+    expect(after.results).toEqual(before.results)
+    expect(after.guesses[0]).toEqual({ ...before.guesses[0], feedback: ['present', 'present', 'present', 'present'] })
   })
 })
 
@@ -138,14 +163,27 @@ describe('first-to-finish races and best of three', () => {
     expect(view.players.find(p => p.user_id === pair.a)?.score).toBe(1)
     expect(view.players.find(p => p.user_id === pair.b)?.attempts).toBe(0)
     expect(view.results[0].reveals[pair.b]).toBe('3344')
+    const opponentView = await state(db, pair.b, pair.room)
+    expect(opponentView.room.status).toBe('round_over')
+    expect(opponentView.results[0]).toEqual(view.results[0])
+    expect(opponentView.results[0].reveals).toEqual({ [pair.a]: '1122', [pair.b]: '3344' })
     expect(await call(db, pair.b, 'submit_guess', [pair.room, '1122', 1])).toEqual({ accepted: false, reason: 'round_finished' })
+    expect((await state(db, pair.b, pair.room)).players).toEqual(opponentView.players)
+    await call(db, pair.a, 'advance_round', [pair.room])
+    expect((await state(db, pair.b, pair.room)).room.status).toBe('round_over')
+    await call(db, pair.b, 'advance_round', [pair.room])
+    const next = await state(db, pair.a, pair.room)
+    expect(next.room.status).toBe('setting')
+    expect(next.room.round_number).toBe(2)
+    expect(next.own_secret).toBeNull()
+    await expect(call(db, pair.a, 'submit_guess', [pair.room, '3344', 1])).rejects.toThrow('not accepting')
   })
   it('does not mistake four matching items in a different order for a solve', async () => {
     const pair = await roomPair(db)
     await start(db, pair)
     await call(db, pair.a, 'submit_guess', [pair.room, '4433', 1])
     const view = await state(db, pair.a, pair.room)
-    expect(view.guesses[0].feedback).toEqual(['hit', 'hit', 'hit', 'hit'])
+    expect(view.guesses[0].feedback).toEqual(['present', 'present', 'present', 'present'])
     expect(view.players.find(p => p.user_id === pair.a)?.solved).toBe(false)
     expect(view.room.status).toBe('playing')
   })
@@ -223,7 +261,7 @@ describe('first-to-finish races and best of three', () => {
     expect((await state(db, pair.a, pair.room)).guesses[0].elapsed_ms).toBeGreaterThan(2_147_483_647)
   })
   it.each([
-    ['word', ['TREE', 'MINT'], 'TIME', ['hit', 'hit', 'hit', 'miss']],
+    ['word', ['TREE', 'MINT'], 'TIME', ['present', 'hit', 'present', 'miss']],
     ['number', ['1122', '3344'], '3333', ['hit', 'hit', 'miss', 'miss']],
   ] as const)('validates and plays %s mode', async (mode, codes, guess, marks) => {
     const pair = await roomPair(db, mode)
@@ -294,14 +332,15 @@ describe('host-controlled setup and protected manual turns', () => {
     await call(db, pair.b, 'submit_guess', [pair.room, '1122', 1])
     expect((await state(db, pair.a, pair.room)).results[0].winner_id).toBe(pair.b)
   })
-  it('validates manual word hints and repeated letters without revealing positions', async () => {
+  it('validates green and yellow manual hints with repeated letters', async () => {
     const pair = await roomPair(db, 'word', 'turns')
     await start(db, pair, ['MINT', 'TREE'])
     await call(db, pair.a, 'submit_guess', [pair.room, 'TEEM', 1])
     const pending = (await state(db, pair.b, pair.room)).pending_guess!
     await expect(call(db, pair.b, 'submit_hints', [pair.room, pending.id, ['hit', 'miss', 'hit', 'hit']])).rejects.toThrow('do not match')
-    await call(db, pair.b, 'submit_hints', [pair.room, pending.id, ['hit', 'hit', 'hit', 'miss']])
-    expect((await state(db, pair.a, pair.room)).guesses[0].feedback).toEqual(['hit', 'hit', 'hit', 'miss'])
+    await expect(call(db, pair.b, 'submit_hints', [pair.room, pending.id, ['hit', 'hit', 'hit', 'miss']])).rejects.toThrow('correct positions green')
+    await call(db, pair.b, 'submit_hints', [pair.room, pending.id, ['hit', 'present', 'hit', 'miss']])
+    expect((await state(db, pair.a, pair.room)).guesses[0].feedback).toEqual(['hit', 'present', 'hit', 'miss'])
   })
   it('alternates the opening player each round and still requires host start', async () => {
     const pair = await roomPair(db, 'number', 'turns')
