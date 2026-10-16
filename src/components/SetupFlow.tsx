@@ -50,13 +50,13 @@ export function SetupFlow({ controller, mode, setMode, variant, setVariant }: { 
       <div className="mode-picker" aria-label="Game mode">{(Object.keys(MODES) as Mode[]).map(key => <button key={key} className={mode === key ? 'active' : ''} aria-pressed={mode === key} onClick={() => setMode(key)}>{MODES[key].name}</button>)}</div>
       <Illustration key={mode} mode={mode} />
       <div className="variant-picker" aria-label="Play style">
-        <button className={variant === 'race' ? 'selected' : ''} aria-pressed={variant === 'race'} onClick={() => setVariant('race')}><Clock3 size={17} /><strong>Live race</strong><small>Play together · elapsed timer</small></button>
-        <button className={variant === 'turns' ? 'selected' : ''} aria-pressed={variant === 'turns'} onClick={() => setVariant('turns')}><Repeat2 size={17} /><strong>Take turns</strong><small>Mark & send checked hints</small></button>
+        <button className={variant === 'race' ? 'selected' : ''} aria-pressed={variant === 'race'} onClick={() => setVariant('race')}><Clock3 size={17} /><strong>Live race</strong><small>Guess together · live timer</small></button>
+        <button className={variant === 'turns' ? 'selected' : ''} aria-pressed={variant === 'turns'} onClick={() => setVariant('turns')}><Repeat2 size={17} /><strong>Take turns</strong><small>One guess each · keep alternating</small></button>
       </div>
       <ol className="how-to-play" aria-label={`${MODES[mode].name} instructions`}>
-        <li><span>1</span><p>{mode === 'word' ? 'Choose a real four-letter secret word.' : 'Choose a secret four-digit code.'}</p></li>
-        <li><span>2</span><p>{variant === 'turns' ? 'Take turns guessing and marking each other’s clues.' : 'Guess together. Green: right place. Yellow: wrong place.'}<small>{variant === 'turns' ? 'Green: right place. Yellow: wrong place. Server-checked.' : 'Grey: no match. Repeated items count carefully.'}</small></p></li>
-        <li><span>3</span><p>First exact answer stops both players and reveals both secrets.<small>Both get ready before the next round. Best of three.</small></p></li>
+        <li><span>1</span><p>Agree to the bets, then {mode === 'word' ? 'pick a secret six-letter word.' : 'pick a secret four-digit code.'}</p></li>
+        <li><span>2</span><p>{variant === 'turns' ? 'Take one guess each. Help mark your friend’s clues.' : 'Guess together and follow the colours.'}<small>Green: right place. Yellow: wrong place. Grey: no match.</small></p></li>
+        <li><span>3</span><p>First to crack the code wins.<small>Unlimited guesses. Best of three rounds.</small></p></li>
       </ol>
       <button className="button primary full" onClick={() => next(3)}>Next · your room <ArrowRight size={18} /></button>
     </section> : <section className="panel wizard-panel room-setup">
@@ -78,7 +78,7 @@ export function SetupFlow({ controller, mode, setMode, variant, setVariant }: { 
 }
 
 export function Illustration({ mode }: { mode: Mode }) {
-  const guess = mode === 'word' ? 'TIME' : '2917'
-  const marks: Mark[] = mode === 'word' ? ['present', 'hit', 'present', 'miss'] : ['miss', 'present', 'hit', 'present']
-  return <div className={`illustration illustration-${mode}`} aria-label={`${MODES[mode].name} example`}><div className="example-secret"><LockKeyhole size={13} /><span>{mode === 'word' ? 'SECRET WORD' : 'SECRET CODE'}</span></div><Tiles mode={mode} value={MODES[mode].sample.join('')} length={4} /><span className="example-arrow">↓</span><Tiles mode={mode} value={guess} marks={marks} length={4} animated /><Legend /></div>
+  const guess = mode === 'word' ? 'LETTER' : '2917'
+  const marks: Mark[] = mode === 'word' ? ['miss', 'hit', 'present', 'miss', 'hit', 'present'] : ['miss', 'present', 'hit', 'present']
+  return <div className={`illustration illustration-${mode}`} aria-label={`${MODES[mode].name} example`}><div className="example-secret"><LockKeyhole size={13} /><span>{mode === 'word' ? 'SECRET WORD' : 'SECRET CODE'}</span></div><Tiles mode={mode} value={MODES[mode].sample.join('')} length={MODES[mode].length} /><span className="example-arrow">↓</span><Tiles mode={mode} value={guess} marks={marks} length={MODES[mode].length} animated /><Legend /></div>
 }

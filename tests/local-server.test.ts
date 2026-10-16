@@ -80,7 +80,7 @@ describe('real local HTTP backend', () => {
     const words = await request<string[]>(server.origin, '/words?offset=0&limit=3', a.token)
     expect(words.status).toBe(200)
     expect(words.data).toHaveLength(3)
-    expect(words.data.every(word => /^[A-Z]{4}$/.test(word))).toBe(true)
+    expect(words.data.every(word => /^[A-Z]{6}$/.test(word))).toBe(true)
     expect((await request(server.origin, '/words?offset=-1', a.token)).status).toBe(400)
     expect((await rpc('get_game_state', a.token, { p_room: 'not-a-uuid' })).status).toBe(400)
     const crossOrigin = await fetch(`${server.origin}/__local_game/session`, { method: 'POST', headers: { Origin: 'https://untrusted.example', 'Content-Type': 'application/json' }, body: '{}' })

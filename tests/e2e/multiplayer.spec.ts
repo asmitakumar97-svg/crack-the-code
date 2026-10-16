@@ -71,17 +71,28 @@ async function createPair(contexts: BrowserContext[], db: PGlite, mode = 'Number
   await expect(b.getByRole('heading', { name: 'Your private room.' })).toBeVisible()
   await expect(b.locator('.stake-badge')).toHaveText('High stakes')
   await b.getByLabel('Your bet', { exact: true }).fill('You bring me a snack.')
-  await b.getByRole('button', { name: 'Save bet & choose secret' }).click()
-  await expect(b.getByLabel(/^Your secret (code|word)$/)).toBeVisible()
+  await b.getByRole('button', { name: 'Save bet', exact: true }).click()
+  for (const page of [a, b]) {
+    await expect(page.getByRole('button', { name: /^Start (game|round)$/ })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Agree & choose secret', exact: true }).click()
+    await expect(page.getByLabel(/^Your secret (code|word)$/)).toBeVisible()
+    await expect(page.getByLabel('Match bets', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Agree & choose secret', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Word bank', exact: true })).toHaveCount(0)
+    if (mode === 'Word Lock') {
+      expect(await page.locator('.keyboard-word .key').first().evaluate(key => key.getBoundingClientRect().height)).toBeGreaterThanOrEqual(58)
+      expect(await page.locator('.keyboard-word .key').first().evaluate(key => parseFloat(getComputedStyle(key).fontSize))).toBeGreaterThanOrEqual(15)
+    }
+  }
   return [a, b]
 }
 async function launchRound(a: Page, b: Page, aCode: string, bCode: string, turns = false) {
+  await expect(a.getByRole('button', { name: /^Start (game|round)$/ })).toHaveCount(0)
   await secret(a, aCode)
+  await expect(a.getByRole('button', { name: /^Start (game|round)$/ })).toHaveCount(0)
   await secret(b, bCode)
-  await expect(a.getByRole('button', { name: /^Agree & start/ })).toBeDisabled()
-  await expect(b.getByRole('button', { name: /^Agree & start/ })).toHaveCount(0)
-  await b.getByRole('button', { name: 'Agree to bets & ready' }).click()
-  await a.getByRole('button', { name: /^Agree & start/ }).click()
+  await expect(b.getByRole('button', { name: /^Start (game|round)$/ })).toHaveCount(0)
+  await a.getByRole('button', { name: /^Start (game|round)$/ }).click()
   await expect(a.getByText('You both start together.')).toBeVisible()
   await expect(a.getByLabel('Your guess', { exact: true })).toBeVisible()
   if (!turns) await expect(b.getByLabel('Your guess', { exact: true })).toBeVisible()
@@ -96,7 +107,7 @@ for (const mode of ['Number Lock', 'Word Lock']) test(`random secret selection s
     await expect(a.getByRole('button', { name: 'Lock my secret' })).toBeDisabled()
     await a.getByRole('button', { name: 'Choose for me' }).click()
     const draft = await input.inputValue()
-    expect(draft).toMatch(mode === 'Word Lock' ? /^[A-Z]{4}$/ : /^[0-9]{4}$/)
+    expect(draft).toMatch(mode === 'Word Lock' ? /^[A-Z]{6}$/ : /^[0-9]{4}$/)
     if (mode === 'Word Lock') expect((await db.query('select word from public.word_bank where word=$1', [draft])).rows).toHaveLength(1)
     expect((await db.query('select * from public.secrets')).rows).toHaveLength(0)
     await expect(b.getByLabel(/^Your secret (code|word)$/)).toHaveValue('')
@@ -106,7 +117,7 @@ for (const mode of ['Number Lock', 'Word Lock']) test(`random secret selection s
     await expect(input).toHaveValue('')
     await a.getByRole('button', { name: 'Choose for me' }).click()
     await a.getByRole('button', { name: 'Delete last character' }).click()
-    await expect(input).toHaveValue(/^.{3}$/)
+    await expect(input).toHaveValue(mode === 'Word Lock' ? /^.{5}$/ : /^.{3}$/)
     await a.getByRole('button', { name: 'Choose for me' }).click()
     const locked = await input.inputValue()
     await a.getByRole('button', { name: 'Lock my secret' }).click()
@@ -115,8 +126,7 @@ for (const mode of ['Number Lock', 'Word Lock']) test(`random secret selection s
     await expect(a.getByRole('button', { name: 'Choose for me' })).toHaveCount(0)
     await b.getByRole('button', { name: 'Choose for me' }).click()
     await b.getByRole('button', { name: 'Lock my secret' }).click()
-    await b.getByRole('button', { name: 'Agree to bets & ready' }).click()
-    await a.getByRole('button', { name: /^Agree & start/ }).click()
+    await a.getByRole('button', { name: /^Start (game|round)$/ }).click()
     await expect(a.getByLabel('Your guess', { exact: true })).toBeVisible()
     for (const page of [a, b]) {
       await expect(page.getByRole('button', { name: 'Choose for me' })).toHaveCount(0)
@@ -180,30 +190,31 @@ test('Word Lock validates real words and supports virtual-key races', async ({ b
     const contexts = await Promise.all([0, 1].map(() => browser.newContext({ viewport: { width: 1280, height: 900 } })))
     try {
       const [a, b] = await createPair(contexts, db, 'Word Lock')
-      await launchRound(a, b, 'TREE', 'MINT')
-        await a.getByLabel('Your guess', { exact: true }).fill('XXXX')
+      await launchRound(a, b, 'LETTER', 'SECRET')
+        await a.getByLabel('Your guess', { exact: true }).fill('XXXXXX')
         await a.getByRole('button', { name: 'Try word' }).click()
-        await expect(a.getByRole('alert')).toHaveText('Choose a word from the word bank.')
+        await expect(a.getByRole('alert')).toHaveText("That word is not in this game's dictionary. Try another six-letter word.")
         await a.getByLabel('Your guess', { exact: true }).fill('')
-      for (const char of 'TIME') await a.getByRole('button', { name: char, exact: true }).click()
+      for (const char of 'STREET') await a.getByRole('button', { name: char, exact: true }).click()
       await a.getByRole('button', { name: /^Try (code|word)$/ }).click()
-      await expect(a.locator('.history-row .tile.filled')).toHaveCount(4)
+      await expect(a.locator('.history-row .tile.filled')).toHaveCount(6)
       await expect(a.locator('.history-row .tile')).toHaveClass([
-        'tile present filled', 'tile hit filled', 'tile present filled', 'tile miss filled',
+        'tile hit filled', 'tile miss filled', 'tile present filled', 'tile present filled', 'tile hit filled', 'tile hit filled',
       ])
-      await expect(a.getByRole('button', { name: 'T', exact: true })).toHaveClass('key present')
-      await expect(a.getByRole('button', { name: 'I', exact: true })).toHaveClass('key hit')
-      await expect(a.getByRole('button', { name: 'E', exact: true })).toHaveClass('key miss')
-      await guess(a, 'ITEM')
+      await expect(a.getByRole('button', { name: 'T', exact: true })).toHaveClass('key hit')
+      await expect(a.getByRole('button', { name: 'R', exact: true })).toHaveClass('key present')
+      await expect(a.getByRole('button', { name: 'E', exact: true })).toHaveClass('key hit')
+      await guess(a, 'LETTER')
       await expect(a.locator('.history-row').last().locator('.tile')).toHaveClass([
-        'tile present filled', 'tile present filled', 'tile miss filled', 'tile present filled',
+        'tile miss filled', 'tile hit filled', 'tile present filled', 'tile miss filled', 'tile hit filled', 'tile present filled',
       ])
-      await expect(a.getByRole('button', { name: 'I', exact: true })).toHaveClass('key hit')
-      await guess(a, 'MILD')
-      await expect(a.getByRole('button', { name: 'M', exact: true })).toHaveClass('key hit')
-      await guess(a, 'TIME')
-      await expect(a.getByRole('button', { name: 'M', exact: true })).toHaveClass('key hit')
-      await guess(a, 'MINT')
+      await expect(a.getByRole('button', { name: 'T', exact: true })).toHaveClass('key hit')
+      for (let attempt = 3; attempt <= 10; attempt++) await guess(a, 'STREET')
+      await expect(a.locator('.history-row')).toHaveCount(10)
+      await expect(a.getByLabel('Your guess', { exact: true })).toBeVisible()
+      await expect(a.locator('.progress-line')).toContainText('Your guesses: 10')
+      await expect(a.getByRole('button', { name: 'Word bank', exact: true })).toHaveCount(0)
+      await guess(a, 'SECRET')
       await expect(a.getByRole('heading', { name: 'You cracked it first!' })).toBeVisible()
       await expect(b.getByRole('heading', { name: 'Alice cracked it first!' })).toBeVisible()
       for (const page of [a, b]) expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
@@ -215,31 +226,31 @@ test('turn-by-turn Word Lock rejects false manual hints, recovers pending guesse
   const contexts = await Promise.all([0, 1].map(() => browser.newContext({ viewport: { width: 320, height: 900 }, isMobile: true, hasTouch: true })))
   try {
     const [a, b] = await createPair(contexts, db, 'Word Lock', 'Take turns')
-    await launchRound(a, b, 'MINT', 'TREE', true)
+    await launchRound(a, b, 'LETTER', 'SECRET', true)
     await expect(a.getByLabel('Elapsed time')).toHaveCount(0)
     await expect(b.getByLabel('Your guess', { exact: true })).toHaveCount(0)
-    await guess(a, 'TEEM')
+    await guess(a, 'STREET')
     await expect(b.getByLabel('Mark clues')).toBeVisible()
     await b.reload()
     await expect(b.getByLabel('Mark clues')).toBeVisible()
     await b.getByRole('button', { name: 'Check & send hints' }).click()
     await expect(b.getByRole('alert')).toContainText('Those hints do not match your secret')
     await expect(a.locator('.history-row')).toHaveCount(0)
-    for (const [index, letter, clicks] of [[1, 'T', 2], [2, 'E', 1], [3, 'E', 2]] as const) {
+    for (const [index, letter, clicks] of [[1, 'S', 2], [3, 'R', 1], [4, 'E', 1], [5, 'E', 2], [6, 'T', 2]] as const) {
       for (let i = 0; i < clicks; i++) await b.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true }).click()
     }
     await b.getByRole('button', { name: 'Check & send hints' }).click()
     await expect(b.getByLabel('Your guess', { exact: true })).toBeVisible()
     await expect(a.getByLabel('Guess history').getByLabel('E, correct position', { exact: true })).toHaveCount(1)
     await expect(a.getByLabel('Guess history').getByLabel('E, wrong position', { exact: true })).toHaveCount(1)
-    await guess(b, 'TIME')
+    await guess(b, 'BETTER')
     await expect(a.getByLabel('Mark clues')).toBeVisible()
-    for (const [index, letter, clicks] of [[1, 'T', 1], [2, 'I', 2], [3, 'M', 1]] as const) {
+    for (const [index, letter, clicks] of [[2, 'E', 2], [3, 'T', 2], [4, 'T', 2], [5, 'E', 2], [6, 'R', 2]] as const) {
       for (let i = 0; i < clicks; i++) await a.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true }).click()
     }
     await a.getByRole('button', { name: 'Check & send hints' }).click()
     await expect(a.getByLabel('Your guess', { exact: true })).toBeVisible()
-    await guess(a, 'TREE')
+    await guess(a, 'SECRET')
     for (const page of [a, b]) {
       await expect(page.getByText('ROUND 1 COMPLETE', { exact: true })).toBeVisible()
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
@@ -263,7 +274,7 @@ test('landing instructions and illustrations follow the selected mode', async ({
       await page.getByRole('button', { name: 'Next', exact: true }).click()
       await page.getByRole('button', { name: 'Word Lock', exact: true }).click()
       await expect(page.getByLabel('Word Lock example')).toBeVisible()
-      await expect(page.getByLabel('Word Lock instructions')).toContainText('Choose a real four-letter secret word.')
+      await expect(page.getByLabel('Word Lock instructions')).toContainText('pick a secret six-letter word.')
       await expect(page.getByLabel('Word Lock example').getByLabel('Code tiles')).toHaveCount(2)
       await page.getByRole('button', { name: 'How to play' }).click()
       await expect(page.getByRole('dialog')).toHaveAccessibleName('How to play Word Lock')
@@ -276,6 +287,30 @@ test('landing instructions and illustrations follow the selected mode', async ({
       await expect(page.getByLabel('Word Lock instructions')).toHaveCount(0)
     } finally { await db.close() }
   } finally { await context.close() }
+})
+
+test('bet agreement appears only on bets, and start appears only on the ready code screen', async ({ browser }) => {
+  const db = await createDatabase()
+  const contexts = await Promise.all([0, 1].map(() => browser.newContext({ viewport: { width: 390, height: 844 } })))
+  try {
+    const [a, b] = await createPair(contexts, db)
+    await secret(a, '1122')
+    await expect(a.getByRole('button', { name: 'Start game', exact: true })).toHaveCount(0)
+    await secret(b, '3344')
+    await expect(a.getByRole('button', { name: 'Start game', exact: true })).toBeVisible()
+    await a.getByRole('tab', { name: 'The bets', exact: true }).click()
+    await expect(a.getByLabel('Match bets', { exact: true })).toBeVisible()
+    await expect(a.getByRole('button', { name: 'Start game', exact: true })).toHaveCount(0)
+    await a.getByRole('button', { name: 'Continue to my secret', exact: true }).click()
+    await b.getByRole('tab', { name: 'The bets', exact: true }).click()
+    await b.getByLabel('Your bet', { exact: true }).fill('You choose our next film.')
+    await b.getByRole('button', { name: 'Save bet', exact: true }).click()
+    await expect(a.getByRole('button', { name: 'Start game', exact: true })).toHaveCount(0)
+    await a.getByRole('button', { name: 'Review and agree to the bets', exact: true }).click()
+    for (const page of [a, b]) await page.getByRole('button', { name: 'Agree & choose secret', exact: true }).click()
+    await expect(a.getByRole('button', { name: 'Start game', exact: true })).toBeVisible()
+    await expect(b.getByRole('button', { name: 'Start game', exact: true })).toHaveCount(0)
+  } finally { await Promise.all(contexts.map(context => context.close())); await db.close() }
 })
 
 test('both players submit exact guesses together and see one winner without an error', async ({ browser }) => {

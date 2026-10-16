@@ -52,6 +52,7 @@ export async function start(db: PGlite, pair: { a: string; b: string; room: stri
   await launch(db, pair)
 }
 export async function launch(db: PGlite, pair: { a: string; b: string; room: string }) {
+  await call(db, pair.a, 'set_ready', [pair.room, true])
   await call(db, pair.b, 'set_ready', [pair.room, true])
   await call(db, pair.a, 'start_round', [pair.room])
   await db.query("update public.rooms set started_at=clock_timestamp()-interval '1 second' where id=$1", [pair.room])

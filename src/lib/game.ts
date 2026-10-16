@@ -6,7 +6,7 @@ export type Phase = 'lobby' | 'setting' | 'playing' | 'round_over' | 'match_over
 
 export const MODES = {
   number: { name: 'Number Lock', label: '01', length: 4, sample: ['3', '7', '1', '9'], detail: '4 digits', keys: '1234567890', description: 'Choose a secret four-digit code. Repeats and leading zeros are allowed.' },
-  word: { name: 'Word Lock', label: '02', length: 4, sample: ['M', 'I', 'N', 'T'], detail: '4-letter words', keys: 'QWERTYUIOPASDFGHJKLZXCVBNM', description: 'Choose a real four-letter word from the word bank.' },
+  word: { name: 'Word Lock', label: '02', length: 6, sample: ['S', 'E', 'C', 'R', 'E', 'T'], detail: '6-letter words', keys: 'QWERTYUIOPASDFGHJKLZXCVBNM', description: 'Choose a six-letter word, or let us pick one.' },
 } satisfies Record<Mode, { name: string; label: string; length: number; sample: string[]; detail: string; keys: string; description: string }>
 
 export interface Player {
@@ -73,12 +73,12 @@ export function formatTime(seconds: number) {
 export function validateEntry(mode: Mode, value: string, words: string[]): string | null {
   if (value.length !== MODES[mode].length) return `Enter exactly ${MODES[mode].length} ${mode === 'word' ? 'letters' : 'digits'}.`
   if (![...value].every(c => MODES[mode].keys.includes(c))) return 'That code contains an unavailable character.'
-  if (mode === 'word' && !words.includes(value)) return 'Choose a word from the word bank.'
+  if (mode === 'word' && !words.includes(value)) return "That word is not in this game's dictionary. Try another six-letter word."
   return null
 }
 
 export function generateSecret(mode: Mode, words: string[]): string {
-  if (mode === 'word' && words.length === 0) throw new Error('The word bank is not ready yet. Try again in a moment.')
+  if (mode === 'word' && words.length === 0) throw new Error('The dictionary is not ready yet. Try again in a moment.')
   const randomIndex = (length: number) => {
     const bytes = new Uint32Array(1)
     const limit = Math.floor(0x100000000 / length) * length

@@ -81,6 +81,7 @@ label,.form-label { display: block; font-size: 12px; color: #b0c2d4; font-weight
 .loading-panel { max-width: 500px; margin: 60px auto; padding: 45px 25px; display: flex; align-items: center; flex-direction: column; gap: 20px; text-align: center; }
 .loading-panel h1 { font-size: 27px; }
 .tiles { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 9px; width: 100%; }
+.tiles-6 { grid-template-columns: repeat(6,minmax(0,1fr)); gap: 5px; }
 .tile { display: flex; align-items: center; justify-content: center; min-width: 0; aspect-ratio: 1; border: 1px solid #344860; border-radius: 10px; color: #eaf3fc; background: #0a1627; font-family: var(--font-mono); font-size: 29px; font-weight: 650; position: relative; }
 .tile.filled { background: #1b2f46; border-color: #6a849c; }
 .tile.hit,.key.hit { background: #194635; border-color: #67c79f; color: #a5f5d3; }
@@ -151,23 +152,19 @@ label,.form-label { display: block; font-size: 12px; color: #b0c2d4; font-weight
 .key-row { display: flex; justify-content: center; gap: 5px; margin-bottom: 7px; }
 .key { flex: 1; display: flex; align-items: center; justify-content: center; min-width: 0; height: 48px; padding: 0; border-radius: 7px; background: #293e56; border: 1px solid #415b76; color: #deedf9; font-size: 16px; font-weight: 550; font-family: var(--font-mono); }
 .key:not(:disabled):hover { background: #415c75; }
-.keyboard-word .key { font-size: 13px; }
+.keyboard-word .key { font-size: 18px; height: 58px; min-height: 58px; }
+.keyboard-word { margin-inline: -6px; }
 .keyboard-word .key-row:nth-child(2) { margin-left: 10px; margin-right: 10px; }
 .keyboard-word .key-row:nth-child(3) { margin-left: 28px; margin-right: 28px; }
 .keyboard-actions { display: flex; align-items: stretch; gap: 8px; margin-top: 13px; }
 .keyboard-actions .backspace { flex: .85; height: auto; font-size: 11px; gap: 5px; background: #1b2c42; }
 .keyboard-actions .button { flex: 1.6; font-size: 12px; padding: 12px 8px; }
-.word-bank { margin-top: 10px; }
-.word-bank .text-button { font-size: 11px; }
-.word-bank-panel { margin-top: 7px; border: 1px solid #354b64; border-radius: 10px; padding: 10px; background: #0a1525; }
-.word-bank-panel input { min-height: 44px; font-size: 16px; padding: 10px; }
-.word-list { display: flex; flex-wrap: wrap; max-height: 200px; overflow: auto; gap: 5px; margin-top: 10px; -webkit-overflow-scrolling: touch; }
-.word-list button { min-height: 40px; border-radius: 6px; background: #1a3733; border: 1px solid #375f52; color: #b3e6d2; padding: 8px; font-family: var(--font-mono); font-size: 12px; }
 .countdown-screen { max-width: 470px; min-height: 340px; margin: auto; padding: 35px; display: flex; align-items: center; flex-direction: column; justify-content: center; gap: 20px; text-align: center; }
 .countdown-screen h1 { font-size: 33px; }
 .countdown-number { color: #8af0cb; font-family: var(--font-mono); font-size: 90px; line-height: 1; animation: count-in .8s both; }
 .countdown-screen p { font-size: 12px; }
 .arena-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+.arena-word { grid-template-columns: minmax(0,.85fr) minmax(0,1.15fr); }
 .input-panel { padding: 25px; grid-column: 2; grid-row: 1; }
 .arena-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 15px; }
 .arena-heading h1 { font-size: 24px; }
@@ -184,9 +181,12 @@ label,.form-label { display: block; font-size: 12px; color: #b0c2d4; font-weight
 .history-row .tile { font-size: 23px; border-radius: 7px; max-height: 58px; }
 .history-row > small { text-align: right; font-family: var(--font-mono); font-size: 8px; color: #738fa8; }
 .own-secret { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; margin-bottom: 18px; border: 1px solid #35564d; border-radius: 10px; background: #14352b55; text-align: left; }
+.own-secret:has(.tiles-6) { flex-wrap: wrap; }
 .own-secret strong { display: flex; align-items: center; gap: 5px; color: #a8eed2; font-size: 12px; }
 .own-secret small { display: block; margin-top: 4px; color: #8ba89d; font-size: 9px; }
 .own-secret .tiles { width: 128px; flex-shrink: 0; gap: 4px; }
+.own-secret .tiles-6 { width: 174px; }
+.history-row .tiles-6 .tile { aspect-ratio: auto; min-height: 40px; font-size: 18px; }
 .own-secret .tile { font-size: 18px; border-radius: 6px; }
 .waiting-state { min-height: 250px; display: flex; align-items: center; flex-direction: column; justify-content: center; gap: 25px; color: #a7bfcf; }
 .waiting-state p { font-size: 13px; }
@@ -276,6 +276,7 @@ label,.form-label { display: block; font-size: 12px; color: #b0c2d4; font-weight
 .hint-editor > .tiles .tile { font-size: 22px; }
 .hint-editor > p { font-size: 12px; margin: 20px 0 13px; }
 .manual-hints { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; }
+.manual-hints.tiles-6 { grid-template-columns: repeat(6,minmax(0,1fr)); gap: 5px; }
 .manual-hints .tile { width: 100%; min-height: 48px; font-size: 28px; }
 .hint-editor .hint-check-note { color: #7795aa; font-size: 10px; margin: 13px 0 20px; }
 .empty-history { font-size: 12px; min-height: 60px; }
@@ -334,7 +335,7 @@ label,.form-label { display: block; font-size: 12px; color: #b0c2d4; font-weight
   .entry-box .tile { max-height: 72px; font-size: 30px; }
   .entry-label { margin-bottom: 9px; }
   .key { min-height: 48px; }
-  .keyboard-word .key { font-size: 12px; border-radius: 5px; }
+  .keyboard-word .key { font-size: 16px; border-radius: 5px; height: 58px; min-height: 58px; }
   .keyboard-actions .button { min-height: 50px; }
   .arena-layout { display: flex; flex-direction: column; gap: 15px; }
   .input-panel,.history-panel { width: 100%; padding: 22px; border-radius: 16px; }
@@ -385,8 +386,9 @@ label,.form-label { display: block; font-size: 12px; color: #b0c2d4; font-weight
   .room-secret-entry .entry-label { margin-bottom: 8px; min-height: 35px; }
   .room-secret-entry .entry-box { margin-bottom: 17px; }
   .room-secret-entry .key { min-height: 44px; height: 44px; }
+  .room-secret-entry .keyboard-word .key { min-height: 58px; height: 58px; }
   .room-secret-entry .keyboard-actions .button { min-height: 46px; }
   .manual-hints .tile { max-height: 75px; }
 }
-@media(max-width:370px) { .app-shell { padding-left: 15px; padding-right: 15px; } .intro h1 { font-size: 43px; } .mode-picker button { font-size: 9px; } .home-form { padding: 20px; } .illustration { padding-left: 25px; padding-right: 25px; } .secret-screen,.input-panel,.history-panel { padding: 20px 17px; } .key-row { gap: 4px; } .keyboard-word .key { font-size: 11px; } .arena-heading h1 { font-size: 22px; } .game-nav { font-size: 10px; } .brand { font-size: 21px; } }
+@media(max-width:370px) { .app-shell { padding-left: 15px; padding-right: 15px; } .intro h1 { font-size: 43px; } .mode-picker button { font-size: 9px; } .home-form { padding: 20px; } .illustration { padding-left: 25px; padding-right: 25px; } .secret-screen,.input-panel,.history-panel { padding: 20px 17px; } .key-row { gap: 3px; } .keyboard-word .key { font-size: 15px; } .arena-heading h1 { font-size: 22px; } .game-nav { font-size: 10px; } .brand { font-size: 21px; } }
 @media(prefers-reduced-motion:reduce) { *,*:before,*:after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } .confetti { display: none; } }

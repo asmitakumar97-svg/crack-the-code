@@ -49,7 +49,7 @@ export function useGame() {
       }
       setWords(bank)
     }
-    void load().catch(err => { if (active) setError(err instanceof Error ? err.message : 'Could not load word bank.') })
+    void load().catch(err => { if (active) setError(err instanceof Error ? err.message : 'Could not load dictionary.') })
     return () => { active = false }
   }, [userId, roomId])
 

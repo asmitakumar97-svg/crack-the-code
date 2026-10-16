@@ -53,22 +53,29 @@ function Game({ controller, game, onHelp }: { controller: Controller; game: Game
 
 function RoomStage({ controller, game, me, opponent }: { controller: Controller; game: GameState; me: Player; opponent?: Player }) {
   const { room } = game
-  const [task, setTask] = useState<'bet' | 'secret'>(me.wager ? 'secret' : 'bet')
+  const [task, setTask] = useState<'bet' | 'secret'>(me.ready ? 'secret' : 'bet')
   const [wager, setWager] = useState(me.wager)
   const host = room.host_id === me.user_id
   const bothBets = Boolean(me.wager && opponent?.wager)
-  const dirtyBet = task === 'bet' && wager.trim() !== me.wager
-  const startable = Boolean(bothBets && me.secret_ready && opponent?.secret_ready && opponent.ready && !dirtyBet)
+  const dirtyBet = wager.trim() !== me.wager
+  const startable = Boolean(bothBets && me.ready && me.secret_ready && opponent?.secret_ready && opponent.ready)
   return <section className="panel room-stage">
     <div className="room-stage-heading"><h1>{room.status === 'setting' ? `Set up round ${room.round_number}.` : 'Your private room.'}</h1><span className="stake-badge">{room.stake === 'high' ? <Flame size={14} /> : <Leaf size={14} />}{room.stake === 'high' ? 'High stakes' : 'Low stakes'}</span></div>
     {!opponent && <div className="share-strip"><span>Invite your friend</span><RoomCode code={room.code} large /><InviteButton code={room.code} /></div>}
-    {room.status === 'lobby' && <div className="room-task-tabs" role="tablist" aria-label="Room setup"><button role="tab" aria-selected={task === 'bet'} className={task === 'bet' ? 'active' : ''} onClick={() => setTask('bet')}>The bets {bothBets && <Check size={13} />}</button><button role="tab" aria-selected={task === 'secret'} className={task === 'secret' ? 'active' : ''} onClick={() => setTask('secret')}>My secret {me.secret_ready && <Check size={13} />}</button></div>}
-    {task === 'bet' && room.status === 'lobby' ? <div className="room-bet-editor"><label htmlFor="room-wager">If you win the match…</label><textarea id="room-wager" aria-label="Your bet" rows={2} maxLength={120} value={wager} onChange={e => setWager(e.target.value)} placeholder={room.stake === 'high' ? 'You plan our next adventure.' : 'You make me a coffee.'} /><button className="button secondary full" disabled={controller.busy || !wager.trim()} onClick={() => {
-      void controller.mutate('set_wager', { p_wager: wager.trim() }).then(ok => { if (ok) setTask('secret') })
-    }}>Save bet & choose secret <ArrowRight size={16} /></button></div> : me.secret_ready ? <div className="room-secret-locked"><LockKeyhole size={23} className="mint" /><h2>Your secret is locked.</h2><Tiles mode={room.mode} value={game.own_secret ?? ''} length={4} /></div> : <div className="room-secret-entry"><p>{MODES[room.mode].description}</p><CodeEntry mode={room.mode} secret words={controller.words} busy={controller.busy || controller.connection === 'offline'} onSubmit={code => controller.mutate('set_secret', { p_code: code })} /></div>}
-    {(me.secret_ready || task === 'bet') && <div className="agreed-bets" aria-label="Match bets"><div><span>If you win</span><strong>{me.wager || 'Write your bet'}</strong></div><div><span>If {opponent?.name ?? 'your friend'} wins</span><strong>{opponent?.wager || (opponent ? 'They’re writing their bet…' : 'Waiting for your friend…')}</strong></div></div>}
-    {me.secret_ready && <>{host ? <button className="button primary full" disabled={controller.busy || !startable} onClick={() => { void controller.mutate('start_round') }}>Agree & start {room.status === 'lobby' ? 'game' : 'round'} <ArrowRight size={18} /></button> : <button className={`button ${me.ready ? 'secondary' : 'primary'} full`} disabled={controller.busy || !bothBets || dirtyBet} onClick={() => { void controller.mutate('set_ready', { p_ready: !me.ready }) }}>{me.ready ? <Check size={18} /> : null}{me.ready ? 'Ready · waiting for the host' : 'Agree to bets & ready'}</button>}
-    <p className="room-ready-note">{host ? startable ? 'Both secrets are locked. You can start.' : !opponent ? 'The game starts when your friend is ready.' : !opponent.secret_ready ? `${opponent.name} is choosing a secret.` : `Waiting for ${opponent.name} to get ready.` : 'Only the room creator can start the round.'}</p></>}
+    {(room.status === 'lobby' || !me.ready) && <div className="room-task-tabs" role="tablist" aria-label="Room setup"><button role="tab" aria-selected={task === 'bet'} className={task === 'bet' ? 'active' : ''} onClick={() => setTask('bet')}>The bets {me.ready && <Check size={13} />}</button><button role="tab" aria-selected={task === 'secret'} className={task === 'secret' ? 'active' : ''} onClick={() => setTask('secret')}>My secret {me.secret_ready && <Check size={13} />}</button></div>}
+    {task === 'bet' ? <>
+      {room.status === 'lobby' && <div className="room-bet-editor"><label htmlFor="room-wager">If you win the match…</label><textarea id="room-wager" aria-label="Your bet" rows={2} maxLength={120} value={wager} onChange={e => setWager(e.target.value)} placeholder={room.stake === 'high' ? 'You plan our next adventure.' : 'You make me a coffee.'} /><button className="button secondary full" disabled={controller.busy || !wager.trim() || !dirtyBet} onClick={() => { void controller.mutate('set_wager', { p_wager: wager.trim() }) }}>Save bet <Check size={16} /></button></div>}
+      <div className="agreed-bets" aria-label="Match bets"><div><span>If you win</span><strong>{me.wager || 'Write your bet'}</strong></div><div><span>If {opponent?.name ?? 'your friend'} wins</span><strong>{opponent?.wager || (opponent ? 'They’re writing their bet…' : 'Waiting for your friend…')}</strong></div></div>
+      <button className="button primary full" disabled={controller.busy || !bothBets || room.status === 'lobby' && dirtyBet} onClick={() => {
+        if (me.ready) setTask('secret')
+        else void controller.mutate('set_ready', { p_ready: true }).then(ok => { if (ok) setTask('secret') })
+      }}>{me.ready ? 'Continue to my secret' : 'Agree & choose secret'} <ArrowRight size={18} /></button>
+      {!bothBets && <p className="room-ready-note">You can agree once both bets are saved.</p>}
+    </> : <>
+      {me.secret_ready ? <div className="room-secret-locked"><LockKeyhole size={23} className="mint" /><h2>Your secret is locked.</h2><Tiles mode={room.mode} value={game.own_secret ?? ''} length={MODES[room.mode].length} /></div> : <div className="room-secret-entry"><p>{MODES[room.mode].description}</p><CodeEntry mode={room.mode} secret words={controller.words} busy={controller.busy || controller.connection === 'offline'} onSubmit={code => controller.mutate('set_secret', { p_code: code })} /></div>}
+      {!me.ready ? <button className="text-button" onClick={() => setTask('bet')}>Review and agree to the bets</button> : host && startable && <button className="button primary full" disabled={controller.busy || controller.connection === 'offline'} onClick={() => { void controller.mutate('start_round') }}>Start {room.status === 'lobby' ? 'game' : 'round'} <ArrowRight size={18} /></button>}
+      <p className="room-ready-note">{!me.ready ? 'Agree on The bets screen before starting.' : !me.secret_ready ? 'Choose your secret, then lock it.' : !opponent ? 'Waiting for your friend to join.' : !opponent.ready ? `Waiting for ${opponent.name} to agree to the bets.` : !opponent.secret_ready ? `${opponent.name} is choosing a secret.` : host ? 'Both secrets are locked. You can start.' : 'Waiting for the host to start.'}</p>
+    </>}
   </section>
 }
 
@@ -105,35 +112,35 @@ function InviteButton({ code }: { code: string }) {
 
 function OwnSecret({ game }: { game: GameState }) {
   const label = game.room.mode === 'word' ? 'Your word' : 'Your code'
-  return <div className="own-secret" role="group" aria-label={label}><div><strong><LockKeyhole size={13} />{label}</strong><small>Only on your screen</small></div><Tiles mode={game.room.mode} value={game.own_secret ?? ''} length={4} /></div>
+  return <div className="own-secret" role="group" aria-label={label}><div><strong><LockKeyhole size={13} />{label}</strong><small>Only on your screen</small></div><Tiles mode={game.room.mode} value={game.own_secret ?? ''} length={MODES[game.room.mode].length} /></div>
 }
 
 function Arena({ controller, game, me, opponent, elapsed, onHelp }: { controller: Controller; game: GameState; me: Player; opponent: Player; elapsed: number; onHelp: () => void }) {
   const pending = game.pending_guess
   const myTurn = game.room.variant === 'race' || game.room.turn_user_id === me.user_id
-  const canGuess = !pending && myTurn && me.attempts < 8
-  return <div className="arena-layout">
+  const canGuess = !pending && myTurn
+  return <div className={`arena-layout arena-${game.room.mode}`}>
     <section className="panel input-panel"><div className="arena-heading"><h1>{pending && pending.user_id !== me.user_id ? 'Your clues, please.' : canGuess ? game.room.variant === 'race' ? 'Beat them to it.' : 'Your turn.' : 'Over to your rival.'}</h1>{game.room.variant === 'race' ? <span className="elapsed" aria-label="Elapsed time"><Clock3 size={13} />{formatTime(elapsed)}</span> : <span className="turn-badge"><Repeat2 size={14} />Take turns</span>}</div>
       <OwnSecret game={game} />
       {pending && pending.user_id !== me.user_id ? <HintEditor key={pending.id} controller={controller} game={game} /> :
-        pending ? <div className="waiting-state pending-state"><Tiles mode={game.room.mode} value={pending.guess} length={4} /><p>{opponent.name} is marking your clues.</p><LoaderCircle className="spin mint" size={20} /></div> :
+        pending ? <div className="waiting-state pending-state"><Tiles mode={game.room.mode} value={pending.guess} length={MODES[game.room.mode].length} /><p>{opponent.name} is marking your clues.</p><LoaderCircle className="spin mint" size={20} /></div> :
           canGuess ? <CodeEntry mode={game.room.mode} words={controller.words} guesses={game.guesses} busy={controller.busy || controller.connection === 'offline'} onSubmit={value => controller.mutate('submit_guess', { p_guess: value, p_attempt: me.attempts + 1 })} /> :
-            <div className="waiting-state"><LockKeyhole size={28} /><p>{me.attempts === 8 ? 'All eight guesses are in.' : `${opponent.name} is choosing a guess.`}</p><LoaderCircle className="spin mint" size={20} /></div>}
-      <div className="progress-line"><span>You: {me.attempts}/8</span><span>{opponent.name}: {opponent.attempts}/8</span></div>
+            <div className="waiting-state"><LockKeyhole size={28} /><p>{opponent.name} is choosing a guess.</p><LoaderCircle className="spin mint" size={20} /></div>}
+      <div className="progress-line"><span>Your guesses: {me.attempts}</span><span>{opponent.name}: {opponent.attempts}</span></div>
     </section>
     <section className="panel history-panel"><div className="history-heading"><h2>Your guesses</h2><button className="icon-button" aria-label="Explain clues" onClick={onHelp}><CircleHelp size={17} /></button></div><Legend /><div className="guess-history" aria-label="Guess history" aria-live="polite">
-      {game.guesses.length === 0 ? <p className="empty-history">Your checked clues will appear here.</p> : game.guesses.map(guess => <div className="history-row" key={guess.id}><span>{guess.attempt}</span><Tiles mode={game.room.mode} value={guess.guess} marks={guess.feedback} length={4} animated /><small>{game.room.variant === 'race' ? formatTime(guess.elapsed_ms / 1000) : `#${guess.attempt}`}</small></div>)}
+      {game.guesses.length === 0 ? <p className="empty-history">Your clues will appear here.</p> : game.guesses.map(guess => <div className="history-row" key={guess.id}><span>{guess.attempt}</span><Tiles mode={game.room.mode} value={guess.guess} marks={guess.feedback} length={MODES[game.room.mode].length} animated /><small>{game.room.variant === 'race' ? formatTime(guess.elapsed_ms / 1000) : `#${guess.attempt}`}</small></div>)}
     </div></section>
   </div>
 }
 
 function HintEditor({ controller, game }: { controller: Controller; game: GameState }) {
-  const [marks, setMarks] = useState<Mark[]>(['miss', 'miss', 'miss', 'miss'])
+  const [marks, setMarks] = useState<Mark[]>(() => Array<Mark>(MODES[game.room.mode].length).fill('miss'))
   const pending = game.pending_guess!
-  return <div className="hint-editor"><span className="hint-label">Your secret · for your eyes only</span><Tiles mode={game.room.mode} value={game.own_secret ?? ''} length={4} /><p>Tap each {game.room.mode === 'word' ? 'letter' : 'digit'} to cycle grey → yellow → green.</p>
+  return <div className="hint-editor"><span className="hint-label">Your secret · for your eyes only</span><Tiles mode={game.room.mode} value={game.own_secret ?? ''} length={MODES[game.room.mode].length} /><p>Mark your friend’s guess. Tap to change: grey → yellow → green.</p>
     <Legend />
-    <div className="manual-hints" aria-label="Mark clues">{[...pending.guess].map((item, i) => <button key={i} className={`tile ${marks[i]}`} aria-label={`Clue ${i + 1}: ${item}`} aria-description={CLUES[marks[i]].label} disabled={controller.busy} onClick={() => setMarks(old => old.map((mark, j) => i === j ? mark === 'miss' ? 'present' : mark === 'present' ? 'hit' : 'miss' : mark))}>{item}<small aria-hidden="true">{CLUES[marks[i]].symbol}</small></button>)}</div>
-    <p className="hint-check-note">Mark green positions first, then remaining copies yellow from left to right. Only correct hints can be sent.</p>
+    <div className={`manual-hints tiles-${MODES[game.room.mode].length}`} aria-label="Mark clues">{[...pending.guess].map((item, i) => <button key={i} className={`tile ${marks[i]}`} aria-label={`Clue ${i + 1}: ${item}`} aria-description={CLUES[marks[i]].label} disabled={controller.busy} onClick={() => setMarks(old => old.map((mark, j) => i === j ? mark === 'miss' ? 'present' : mark === 'present' ? 'hit' : 'miss' : mark))}>{item}<small aria-hidden="true">{CLUES[marks[i]].symbol}</small></button>)}</div>
+    <p className="hint-check-note">Green matches first. Only use each matching letter or digit once.</p>
     <button className="button primary full" disabled={controller.busy || controller.connection === 'offline'} onClick={() => { void controller.mutate('submit_hints', { p_guess_id: pending.id, p_marks: marks }) }}>Check & send hints <CheckCheck size={17} /></button>
   </div>
 }
@@ -149,9 +156,9 @@ function Results({ game, me, opponent, controller }: { game: GameState; me: Play
     {winner && <div className="confetti" aria-hidden="true">{Array.from({ length: 24 }, (_, i) => <i key={i} style={{ '--x': `${(i * 43) % 100}%`, '--delay': `${(i % 6) * .12}s`, '--color': i % 2 ? '#efc16d' : '#8af0cb' } as CSSProperties} />)}</div>}
     <span className="winner-icon"><Trophy size={40} /></span><span className="eyebrow">{matchOver ? 'MATCH COMPLETE' : `ROUND ${game.room.round_number} COMPLETE`}</span>
     <h1>{winner ? youWon ? matchOver ? 'You win the match!' : 'You cracked it first!' : `${winner.name} ${matchOver ? 'wins the match!' : 'cracked it first!'}` : 'It’s a draw.'}</h1>
-    <p>{matchOver ? `${me.score} – ${opponent.score}` : winner ? `Round to ${youWon ? 'you' : winner.name}.` : 'Both players used all eight guesses.'}</p>
+    <p>{matchOver ? `${me.score} – ${opponent.score}` : winner ? `Round to ${youWon ? 'you' : winner.name}.` : 'No round winner.'}</p>
     {matchOver && <div className="winning-bet"><span>{winner ? `${youWon ? 'Your' : `${winner.name}’s`} winning bet` : 'No bet won this time'}</span>{winner && <blockquote>{winner.wager}</blockquote>}</div>}
-    <div className="reveal-grid">{[me, opponent].map(player => <div className="reveal-card" key={player.user_id}><span>{player.user_id === me.user_id ? 'Your secret' : `${player.name}’s secret`}</span><Tiles mode={game.room.mode} value={result.reveals[player.user_id] ?? ''} length={4} animated /></div>)}</div>
+    <div className="reveal-grid">{[me, opponent].map(player => <div className="reveal-card" key={player.user_id}><span>{player.user_id === me.user_id ? 'Your secret' : `${player.name}’s secret`}</span><Tiles mode={game.room.mode} value={result.reveals[player.user_id] ?? ''} length={MODES[game.room.mode].length} animated /></div>)}</div>
     {!matchOver && <p>Guessing has stopped for both players. Both must be ready before the next round.</p>}
     <button className="button primary full" disabled={controller.busy || me.next_ready} onClick={() => { void controller.mutate('advance_round') }}>{me.next_ready ? <Check size={18} /> : <ArrowRight size={18} />}{me.next_ready ? 'Waiting for your friend…' : matchOver ? 'New match · new bets' : `Ready for round ${game.room.round_number + 1}`}</button>
   </section>
@@ -165,5 +172,5 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 function Rules({ mode, turns, onClose }: { mode: Mode; turns: boolean; onClose: () => void }) {
-  return <Modal title={`How to play ${MODES[mode].name}`} onClose={onClose}><p>{MODES[mode].description} The room creator starts after both secrets are locked and both bets agreed.</p><Legend /><p>Green means the correct item in the correct position. Yellow means it belongs elsewhere. Grey means no unmatched copy remains. Green positions count first; extra matching copies count left to right.</p><p>{turns ? 'Take turns guessing. The secret owner marks the clues; the server checks every hint before sending it. The first player alternates each round.' : 'Both players guess simultaneously. The visible timer tracks elapsed time only.'}</p><p>Eight guesses, no time limit. The first exact answer stops guessing for both players and reveals both secrets. Both choose to continue, lock new secrets, and wait for the host to start the next round. Best of three; a tied match means no bet is won.</p><button className="button primary full" onClick={onClose}>Got it <Check size={17} /></button></Modal>
+  return <Modal title={`How to play ${MODES[mode].name}`} onClose={onClose}><p>Agree to the bets, choose your secrets, and let the host start. {MODES[mode].description}</p><Legend /><p>Use the colours to find your friend’s secret. Repeated letters and digits only count as many times as they appear.</p><p>{turns ? 'One guess each, taking turns until someone wins. Your friend marks the clues, and the game checks them. The starting player swaps each round. There is no timer.' : 'Both players guess together. The timer shows how long you have been playing; there is no deadline.'}</p><p>Unlimited guesses. The first exact answer stops both players and reveals both secrets. Both choose to continue before picking new secrets. Best of three rounds; bets are agreed once per match.</p><button className="button primary full" onClick={onClose}>Got it <Check size={17} /></button></Modal>
 }

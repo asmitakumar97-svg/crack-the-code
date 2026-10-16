@@ -4,7 +4,7 @@ import { formatTime, generateSecret, validateEntry } from '../src/lib/game'
 describe('client validation', () => {
   it('accepts duplicates and leading zeros', () => {
     expect(validateEntry('number', '0011', [])).toBeNull()
-    expect(validateEntry('word', 'TREE', ['TREE'])).toBeNull()
+    expect(validateEntry('word', 'LETTER', ['LETTER'])).toBeNull()
   })
 
   describe('random private secrets', () => {
@@ -29,14 +29,14 @@ describe('client validation', () => {
 
     it('selects a valid word from the loaded word bank', () => {
       randomValues([1])
-      const words = ['MINT', 'TREE', 'TIME']
+      const words = ['SECRET', 'LETTER', 'STREET']
       const secret = generateSecret('word', words)
-      expect(secret).toBe('TREE')
+      expect(secret).toBe('LETTER')
       expect(validateEntry('word', secret, words)).toBeNull()
     })
 
     it('does not silently invent a word when the bank is unavailable', () => {
-      expect(() => generateSecret('word', [])).toThrow('The word bank is not ready yet.')
+      expect(() => generateSecret('word', [])).toThrow('The dictionary is not ready yet.')
     })
 
     it('rejects out-of-range random samples instead of biasing selection', () => {
@@ -48,8 +48,9 @@ describe('client validation', () => {
   it('rejects malformed and non-dictionary entries', () => {
     expect(validateEntry('number', '123', [])).not.toBeNull()
     expect(validateEntry('number', '12AB', [])).not.toBeNull()
-    expect(validateEntry('word', 'ABCD', ['TREE'])).not.toBeNull()
-    expect(validateEntry('word', 'APPLE', ['TREE'])).not.toBeNull()
+    expect(validateEntry('word', 'TREE', ['LETTER'])).not.toBeNull()
+    expect(validateEntry('word', 'APPLE', ['LETTER'])).not.toBeNull()
+    expect(validateEntry('word', 'XXXXXX', ['LETTER'])).toBe("That word is not in this game's dictionary. Try another six-letter word.")
   })
   it('formats and clamps round timers', () => {
     expect(formatTime(300)).toBe('05:00')

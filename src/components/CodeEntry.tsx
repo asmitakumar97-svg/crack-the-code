@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { ArrowRight, Delete, LockKeyhole, Search, Shuffle } from 'lucide-react'
+import { ArrowRight, Delete, LockKeyhole, Shuffle } from 'lucide-react'
 import { MODES, displayItem, generateSecret, validateEntry, type Mark, type Mode, type Guess } from '../lib/game'
 import { CLUES, Tiles } from './Tiles'
 
@@ -8,8 +8,6 @@ export function CodeEntry({ mode, secret = false, words, busy, onSubmit, guesses
 }) {
   const [value, setValue] = useState('')
   const [error, setError] = useState('')
-  const [bank, setBank] = useState(false)
-  const [search, setSearch] = useState('')
   const id = useId()
   const config = MODES[mode]
   const submit = async () => {
@@ -70,15 +68,5 @@ export function CodeEntry({ mode, secret = false, words, busy, onSubmit, guesses
         </button>
       </div>
     </div>
-    {mode === 'word' && <div className="word-bank">
-      <button className="text-button" onClick={() => setBank(!bank)} aria-expanded={bank}><Search size={14} />{bank ? 'Close word bank' : 'Word bank'}</button>
-      {bank && <div className="word-bank-panel">
-        <input aria-label="Search word bank" placeholder="Find a four-letter word…" value={search} onChange={e => setSearch(e.target.value.toUpperCase())} />
-        <div className="word-list">
-          {words.filter(word => word.includes(search)).map(word => <button key={word} disabled={busy} onClick={() => { setValue(word); setBank(false); setError('') }}>{word}</button>)}
-          {!words.some(word => word.includes(search)) && <p>No matching words.</p>}
-        </div>
-      </div>}
-    </div>}
   </div>
 }

@@ -16,20 +16,25 @@ async function roomPair(a: Page, b: Page, mode = 'Number Lock', turns = false) {
   await a.getByLabel('Your bet', { exact: true }).fill('You make me coffee.')
   await expect(a.getByText(/Next: enter your private/)).toBeVisible()
   await a.getByRole('button', { name: 'Create private room' }).click()
-  await expect(a.getByLabel(/^Your secret (code|word)$/)).toBeVisible()
+  await expect(a.getByRole('button', { name: 'Agree & choose secret', exact: true })).toBeDisabled()
   const code = await a.locator('.room-code-block.large strong').innerText()
   await nameAndInstructions(b, 'Bob', mode, turns, code)
   await b.getByRole('button', { name: 'Join private room' }).click()
   await expect(b.locator('.stake-badge')).toHaveText('High stakes')
   await b.getByLabel('Your bet', { exact: true }).fill('You bring a snack.')
-  await b.getByRole('button', { name: 'Save bet & choose secret' }).click()
-  await expect(b.getByLabel(/^Your secret (code|word)$/)).toBeVisible()
+  await b.getByRole('button', { name: 'Save bet', exact: true }).click()
+  for (const page of [a, b]) {
+    await expect(page.getByRole('button', { name: /^Start (game|round)$/ })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Agree & choose secret', exact: true }).click()
+    await expect(page.getByLabel(/^Your secret (code|word)$/)).toBeVisible()
+    await expect(page.getByLabel('Match bets', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Word bank', exact: true })).toHaveCount(0)
+  }
 }
 
 async function start(a: Page, b: Page) {
-  await expect(a.getByRole('button', { name: /^Agree & start/ })).toBeDisabled()
-  await b.getByRole('button', { name: 'Agree to bets & ready' }).click()
-  await a.getByRole('button', { name: /^Agree & start/ }).click()
+  await expect(b.getByRole('button', { name: /^Start (game|round)$/ })).toHaveCount(0)
+  await a.getByRole('button', { name: /^Start (game|round)$/ }).click()
   await expect(a.getByLabel('Your guess', { exact: true })).toBeVisible()
 }
 
@@ -43,7 +48,7 @@ for (const mode of ['Number Lock', 'Word Lock']) test(`real local ${mode} create
     const secrets: string[] = []
     for (const page of [a, b]) {
       const input = page.getByLabel(/^Your secret (code|word)$/)
-      const typed = mode === 'Word Lock' ? 'MINT' : '0011'
+      const typed = mode === 'Word Lock' ? 'SECRET' : '0011'
       await input.fill(typed)
       await expect(input).toHaveAttribute('type', 'text')
       await expect(page.locator('.code-entry .tile')).toHaveText([...typed])
@@ -51,7 +56,7 @@ for (const mode of ['Number Lock', 'Word Lock']) test(`real local ${mode} create
       await page.getByRole('button', { name: 'Choose for me' }).click()
       secrets.push(await input.inputValue())
       await expect(page.locator('.code-entry .tile')).toHaveText([...secrets.at(-1)!])
-      expect(secrets.at(-1)).toMatch(mode === 'Word Lock' ? /^[A-Z]{4}$/ : /^\d{4}$/)
+      expect(secrets.at(-1)).toMatch(mode === 'Word Lock' ? /^[A-Z]{6}$/ : /^\d{4}$/)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
       await page.getByRole('button', { name: 'Lock my secret' }).click()
       await expect(page.getByRole('heading', { name: 'Your secret is locked.' })).toBeVisible()
@@ -85,22 +90,22 @@ test('real local turns reject false hints and enforce alternating play', async (
     const [a, b] = await Promise.all(contexts.map(context => context.newPage()))
     await roomPair(a, b, 'Word Lock', true)
     for (const [index, page] of [a, b].entries()) {
-      await page.getByLabel('Your secret word', { exact: true }).fill(index === 0 ? 'MINT' : 'TREE')
+      await page.getByLabel('Your secret word', { exact: true }).fill(index === 0 ? 'LETTER' : 'SECRET')
       await page.getByRole('button', { name: 'Lock my secret' }).click()
     }
     await start(a, b)
     await expect(b.getByLabel('Your guess', { exact: true })).toHaveCount(0)
-    await a.getByLabel('Your guess', { exact: true }).fill('TEEM')
+    await a.getByLabel('Your guess', { exact: true }).fill('STREET')
     await a.getByRole('button', { name: 'Try word' }).click()
     await expect(b.getByLabel('Mark clues')).toBeVisible()
-    await expect(b.getByRole('group', { name: 'Your word', exact: true }).locator('.tile')).toHaveText([...'TREE'])
+    await expect(b.getByRole('group', { name: 'Your word', exact: true }).locator('.tile')).toHaveText([...'SECRET'])
     await b.getByRole('button', { name: 'Check & send hints' }).click()
     await expect(b.getByRole('alert')).toContainText('Those hints do not match your secret')
     await expect(a.locator('.history-row')).toHaveCount(0)
     await b.reload()
     await expect(b.getByLabel('Mark clues')).toBeVisible()
-    await expect(b.getByRole('group', { name: 'Your word', exact: true }).locator('.tile')).toHaveText([...'TREE'])
-    for (const [index, letter, clicks] of [[1, 'T', 2], [2, 'E', 1], [3, 'E', 2]] as const) {
+    await expect(b.getByRole('group', { name: 'Your word', exact: true }).locator('.tile')).toHaveText([...'SECRET'])
+    for (const [index, letter, clicks] of [[1, 'S', 2], [3, 'R', 1], [4, 'E', 1], [5, 'E', 2], [6, 'T', 2]] as const) {
       for (let i = 0; i < clicks; i++) await b.getByRole('button', { name: `Clue ${index}: ${letter}`, exact: true }).click()
     }
     await b.getByRole('button', { name: 'Check & send hints' }).click()
@@ -108,7 +113,7 @@ test('real local turns reject false hints and enforce alternating play', async (
     await expect(a.getByLabel('Guess history').getByLabel('E, correct position', { exact: true })).toHaveCount(1)
     await expect(a.getByLabel('Guess history').getByLabel('E, wrong position', { exact: true })).toHaveCount(1)
     await expect(a.getByLabel('Your guess', { exact: true })).toHaveCount(0)
-    await b.getByLabel('Your guess', { exact: true }).fill('MINT')
+    await b.getByLabel('Your guess', { exact: true }).fill('LETTER')
     await b.getByRole('button', { name: 'Try word' }).click()
     await expect(b.getByRole('heading', { name: 'You cracked it first!' })).toBeVisible()
     await expect(a.getByRole('heading', { name: 'Bob cracked it first!' })).toBeVisible()
