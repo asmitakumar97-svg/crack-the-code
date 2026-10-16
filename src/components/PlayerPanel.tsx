@@ -3,24 +3,12 @@ import type { User } from '@supabase/supabase-js'
 import { LogIn, LogOut, RefreshCw } from 'lucide-react'
 import { googleAuthEnabled, localPlay, rpc, supabase } from '../lib/supabase'
 import { MODES, type BetRecord } from '../lib/game'
+import { getGooglePhoto } from '../lib/avatars'
+import { PlayerAvatar } from './PlayerAvatar'
 
-export function PlayerPanel({ userId, inRoom }: { userId: string; inRoom: boolean }) {
-  const [user, setUser] = useState<User | null>(null)
+export function PlayerPanel({ userId, inRoom, user }: { userId: string; inRoom: boolean; user: User | null }) {
   const [authBusy, setAuthBusy] = useState(false)
   const [error, setError] = useState('')
-  useEffect(() => {
-    if (!supabase) return
-    let active = true
-    void supabase.auth.getSession().then(({ data, error }) => {
-      if (!active) return
-      if (error) setError(error.message)
-      else setUser(data.session?.user ?? null)
-    }).catch(err => { if (active) setError(err instanceof Error ? err.message : 'Could not load your account.') })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (active) setUser(session?.user ?? null)
-    })
-    return () => { active = false; subscription.unsubscribe() }
-  }, [])
   const signedIn = Boolean(user && !user.is_anonymous)
   const accountAction = async (signOut: boolean) => {
     if (!supabase || inRoom || (!signOut && !googleAuthEnabled)) {
@@ -46,7 +34,7 @@ export function PlayerPanel({ userId, inRoom }: { userId: string; inRoom: boolea
   }
   return <div className="player-panel">
     <section className="account-card">
-      <h2>{signedIn ? 'Account connected' : localPlay ? 'Local player' : 'Guest player'}</h2>
+      <div className="account-identity"><PlayerAvatar identity={userId} name="You" photoUrl={getGooglePhoto(user)} large /><div><span className="eyebrow">YOUR PLAYER</span><h2>{signedIn ? 'Account connected' : localPlay ? 'Local player' : 'Guest player'}</h2></div></div>
       <p>{signedIn ? 'Your completed matches and bets follow this account across devices.' : 'Guest history belongs to this browser identity. Sign in before playing to save future wins across devices. Guest history is not merged into a Google account.'}</p>
       {!localPlay && <button className="button secondary full" disabled={authBusy || inRoom || !userId || !signedIn && !googleAuthEnabled} onClick={() => { void accountAction(signedIn) }}>{signedIn ? <LogOut size={16} /> : <LogIn size={16} />}{authBusy ? 'Opening…' : signedIn ? 'Sign out on this device' : 'Sign in with Google'}</button>}
       {inRoom && <p className="account-note">Finish your match and return Home before changing accounts.</p>}

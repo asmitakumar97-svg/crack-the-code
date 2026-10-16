@@ -23,9 +23,10 @@ input::placeholder,textarea::placeholder { color: #71869e; font-size: 14px; }
 label,.form-label { display: block; font-size: 12px; color: #b0c2d4; font-weight: 600; margin-bottom: 10px; }
 .app-shell { max-width: 1120px; padding: 0 40px max(40px,env(safe-area-inset-bottom)); margin: auto; }
 .site-header { height: 90px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #253449; }
-.brand { display: flex; align-items: center; gap: 11px; font-size: 24px; font-weight: 750; letter-spacing: -.055em; }
-.brand-light { color: #adbdcf; font-weight: 450; }
-.brand-icon { display: grid; place-items: center; width: 39px; height: 39px; background: #193d33; border: 1px solid #8af0cb33; border-radius: 12px; color: #8af0cb; }
+.brand { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.brand > img { width: 48px; height: 48px; flex-shrink: 0; }
+.brand-wordmark { font-family: "Segoe UI", system-ui, -apple-system, sans-serif; font-size: clamp(22px,2.6vw,27px); font-weight: 750; letter-spacing: .005em; line-height: 1.2; color: #edf3fa; }
+.brand-wordmark small { display: block; margin-top: 5px; font-size: 9px; font-weight: 600; letter-spacing: .12em; color: #a9c3bb; }
 .mint { color: #8af0cb; }
 .eyebrow { color: #8fbcae; letter-spacing: .14em; font-size: 10px; font-weight: 650; }
 .icon-button { width: 44px; height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #34445c; background: #162237; color: #b9cadd; border-radius: 10px; }
@@ -290,8 +291,8 @@ label,.form-label { display: block; font-size: 12px; color: #b0c2d4; font-weight
 @media(max-width:720px) {
   .app-shell { padding: 0 max(20px,env(safe-area-inset-left)) max(30px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-right)); }
   .site-header { height: 76px; padding-top: env(safe-area-inset-top); }
-  .brand { font-size: 23px; gap: 9px; }
-  .brand-icon { height: 35px; width: 35px; border-radius: 10px; }
+  .brand { gap: 10px; }
+  .brand > img { height: 44px; width: 44px; }
   .site-header > .icon-button { background: transparent; border: 0; }
   .home-layout { display: flex; flex-direction: column; gap: 28px; padding-top: 30px; align-items: stretch; }
   .intro > .eyebrow { font-size: 9px; }
@@ -396,6 +397,15 @@ label,.form-label { display: block; font-size: 12px; color: #b0c2d4; font-weight
 
 .site-header { height: auto; min-height: 90px; flex-wrap: wrap; gap: 12px; padding-block: max(16px,env(safe-area-inset-top)) 16px; }
 .header-actions { display: flex; align-items: center; gap: 7px; margin-left: auto; }
+.player-avatar { display: inline-flex; flex-shrink: 0; width: 100%; height: 100%; border-radius: inherit; }
+.player-avatar > img,.player-avatar > svg { display: block; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.account-button { padding: 4px; border-radius: 15px; }
+.account-button .player-avatar { border-radius: 10px; }
+.account-identity { display: flex; align-items: center; gap: 15px; margin-bottom: 16px; }
+.account-identity > div { min-width: 0; }
+.account-identity h2 { margin-top: 5px; }
+.player-avatar-large { width: 68px; height: 68px; border-radius: 22px; }
+@media(max-width:600px) { .header-actions { width: 100%; margin-left: 0; } .header-actions .theme-control { margin-right: auto; } }
 .theme-choices { display: flex; gap: 2px; padding: 3px; border: 1px solid #34445c; border-radius: 11px; background: #111d2e; }
 .theme-choices button { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 38px; padding: 6px 9px; border: 1px solid transparent; border-radius: 8px; background: none; color: #a9bcd0; font-size: 10px; }
 .theme-choices button[aria-pressed="true"] { background: #244136; color: #b2f1d8; border-color: #527c6d; }
@@ -419,7 +429,6 @@ label,.form-label { display: block; font-size: 12px; color: #b0c2d4; font-weight
 :root[data-theme="pastel"] body { background: radial-gradient(ellipse at 10% 10%,#dcf3e5aa,transparent 55%),radial-gradient(ellipse at 90% 60%,#f9dfdbaa,transparent 60%); }
 :root[data-theme="pastel"] p,
 :root[data-theme="pastel"] label,
-:root[data-theme="pastel"] .brand-light,
 :root[data-theme="pastel"] .legend > span,
 :root[data-theme="pastel"] .game-nav,
 :root[data-theme="pastel"] .progress-line,
@@ -440,6 +449,8 @@ label,.form-label { display: block; font-size: 12px; color: #b0c2d4; font-weight
 :root[data-theme="pastel"] .local-play-notice,
 :root[data-theme="pastel"] .bet-history-card > small { color: #59637a; }
 :root[data-theme="pastel"] .panel { color: #30364f; background: linear-gradient(145deg,#fffefd,#f8f4ff); border-color: #d9cee7; box-shadow: 0 18px 65px #65527812; }
+:root[data-theme="pastel"] .brand-wordmark { color: #30364f; }
+:root[data-theme="pastel"] .brand-wordmark small { color: #526a60; }
 :root[data-theme="pastel"] input,
 :root[data-theme="pastel"] textarea { background: #fffdfd; color: #30364f; border-color: #c8bbd9; }
 :root[data-theme="pastel"] input::placeholder,

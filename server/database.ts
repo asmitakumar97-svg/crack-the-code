@@ -25,6 +25,11 @@ export async function openGameDatabase(dataDir?: string) {
         create publication supabase_realtime;
       `)
       await tx.exec(`
+        alter table auth.users add column if not exists raw_user_meta_data jsonb not null default '{}'::jsonb;
+        alter table auth.users add column if not exists raw_app_meta_data jsonb not null default '{}'::jsonb;
+        alter table auth.users add column if not exists is_anonymous boolean not null default true;
+      `)
+      await tx.exec(`
         create schema if not exists local_server;
         revoke all on schema local_server from public, anon, authenticated;
         create table if not exists local_server.migrations (

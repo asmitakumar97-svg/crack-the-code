@@ -12,6 +12,7 @@ export const MODES = {
 
 export interface Player {
   user_id: string
+  avatar_url?: string | null
   name: string
   seat: number
   score: number

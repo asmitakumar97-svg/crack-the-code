@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, Check, CheckCheck, CircleHelp, Clock3, CodeXml, Copy, Flame, Leaf, LoaderCircle, LockKeyhole, Repeat2, Trophy, UserRound, Users, WifiOff, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, CheckCheck, CircleHelp, Clock3, Copy, Flame, Leaf, LoaderCircle, LockKeyhole, Repeat2, Trophy, Users, WifiOff, X } from 'lucide-react'
 import { useGame } from './hooks/useGame'
 import { formatTime, getFeedback, MODES, type GameState, type Mark, type Mode, type Player, type SoloChallenge, type Variant } from './lib/game'
 import { CLUES, Legend, Tiles } from './components/Tiles'
@@ -10,6 +10,8 @@ import { ThemeControl } from './components/ThemeControl'
 import { PlayerPanel } from './components/PlayerPanel'
 import { SoloGame } from './components/SoloGame'
 import { HistoryPanel } from './components/HistoryPanel'
+import { PlayerAvatar } from './components/PlayerAvatar'
+import { getGooglePhoto } from './lib/avatars'
 
 type Controller = ReturnType<typeof useGame>
 
@@ -29,7 +31,7 @@ export default function App() {
     catch { setNavigationError('Your play mode changed, but this browser could not save the preference.') }
   }
   return <div className="app-shell">
-    <header className="site-header"><div className="brand"><span className="brand-icon"><CodeXml size={23} /></span><span>crack<span className="brand-light">the</span>code<span className="mint">.</span></span></div><div className="header-actions"><ThemeControl /><button className="icon-button" aria-label="Player account and bet history" onClick={() => setProfile(true)}><UserRound size={20} /></button><button className="icon-button" aria-label="How to play" onClick={() => setHelp(true)}><CircleHelp size={20} /></button></div></header>
+    <header className="site-header"><div className="brand"><img src={`${import.meta.env.BASE_URL}favicon.svg?v=lock-tiles`} width={48} height={48} alt="" /><span className="brand-wordmark">Crack the Code<small>A LITTLE LOGIC. A LITTLE MAGIC.</small></span></div><div className="header-actions"><ThemeControl /><button className="icon-button account-button" aria-label="Player account and bet history" onClick={() => setProfile(true)}><PlayerAvatar identity={controller.userId} name="You" photoUrl={getGooglePhoto(controller.account)} /></button><button className="icon-button" aria-label="How to play" onClick={() => setHelp(true)}><CircleHelp size={20} /></button></div></header>
     <main>
       {localPlay && <div className="local-play-notice" role="status"><strong>Local multiplayer</strong><span>Player 2: open this address in a private browser window. Updates every second.</span></div>}
       {(error || syncError) && <div className="error-banner" role="alert"><span>{error || syncError}</span>{error && <button className="icon-button" aria-label="Dismiss error" onClick={controller.dismissError}><X size={17} /></button>}</div>}
@@ -38,7 +40,7 @@ export default function App() {
       {!roomId ? solo ? <SoloGame userId={controller.userId} mode={homeMode} challenge={soloChallenge} onModeChange={setHomeMode} onChallengeChange={setSoloChallenge} onHelp={() => setHelp(true)} onHome={() => choosePlay(false)} /> : <SetupFlow controller={controller} mode={homeMode} setMode={setHomeMode} variant={homeVariant} setVariant={setHomeVariant} /> : !game ? <section className="panel loading-panel">{loading ? <LoaderCircle className="spin mint" size={28} /> : <WifiOff size={28} />}<h1>{loading ? 'Opening your room…' : 'Couldn’t connect'}</h1><button className="button secondary" onClick={controller.home}>Back</button></section> : <Game controller={controller} game={game} onHelp={() => setHelp(true)} />}
     </main>
     {help && <Rules mode={game?.room.mode ?? homeMode} turns={(game?.room.variant ?? homeVariant) === 'turns'} solo={!roomId && solo ? soloChallenge : undefined} onClose={() => setHelp(false)} />}
-    {profile && <Modal title="Your player & bets" onClose={() => setProfile(false)}><PlayerPanel userId={controller.userId} inRoom={Boolean(roomId) || solo} /></Modal>}
+    {profile && <Modal title="Your player & bets" onClose={() => setProfile(false)}><PlayerPanel userId={controller.userId} user={controller.account} inRoom={Boolean(roomId) || solo} /></Modal>}
   </div>
 }
 
@@ -98,7 +100,7 @@ function RoomStage({ controller, game, me, opponent }: { controller: Controller;
 }
 
 function PlayerBadge({ player, you = false, online }: { player: Player; you?: boolean; online: boolean }) {
-  return <div className="player-badge"><span className={`avatar ${you ? '' : 'opponent-avatar'}`}>{player.name.slice(0, 1).toUpperCase()}<i className={`status-dot ${online ? '' : 'offline-dot'}`} /></span><strong>{player.name}{you && <small>you</small>}</strong></div>
+  return <div className="player-badge"><span className={`avatar ${you ? '' :  'opponent-avatar'}`}><PlayerAvatar identity={player.user_id} name={player.name} photoUrl={player.avatar_url} /><i className={`status-dot ${online ? '' : 'offline-dot'}`} /></span><strong>{player.name}{you && <small>you</small>}</strong></div>
 }
 
 function RoomCode({ code, large = false }: { code: string; large?: boolean }) {

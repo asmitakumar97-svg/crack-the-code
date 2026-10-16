@@ -3,8 +3,11 @@ import type { PGlite } from '@electric-sql/pglite'
 import { asUser, user } from '../database'
 
 // Test-only transport backed by the actual migrations, roles and RPCs.
-export async function connect(context: BrowserContext, db: PGlite, anonymous = true, existingId?: string) {
+export async function connect(context: BrowserContext, db: PGlite, anonymous = true, existingId?: string, profile: { avatarUrl?: string } = {}) {
   const id = existingId ?? await user(db)
+  const appMetadata = anonymous ? {} : { provider: 'google', providers: ['google'] }
+  const userMetadata = profile.avatarUrl ? { avatar_url: profile.avatarUrl } : {}
+  await db.query('update auth.users set is_anonymous=$2,raw_app_meta_data=$3,raw_user_meta_data=$4 where id=$1', [id, anonymous, JSON.stringify(appMetadata), JSON.stringify(userMetadata)])
   const token = [
     Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url'),
     Buffer.from(JSON.stringify({ sub: id, aud: 'authenticated', role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url'),
@@ -16,7 +19,7 @@ export async function connect(context: BrowserContext, db: PGlite, anonymous = t
     try {
       let result: unknown
       if (url.pathname.startsWith('/auth/')) {
-        result = { access_token: token, refresh_token: 'test-refresh', token_type: 'bearer', expires_in: 3600, user: { id, aud: 'authenticated', role: 'authenticated', is_anonymous: anonymous, created_at: new Date().toISOString(), app_metadata: {}, user_metadata: {} } }
+        result = { access_token: token, refresh_token: 'test-refresh', token_type: 'bearer', expires_in: 3600, user: { id, aud: 'authenticated', role: 'authenticated', is_anonymous: anonymous, created_at: new Date().toISOString(), app_metadata: appMetadata, user_metadata: userMetadata } }
       } else if (url.pathname === '/rest/v1/word_bank') {
         const offset = Number(url.searchParams.get('offset') ?? 0)
         const limit = Number(url.searchParams.get('limit') ?? 1000)

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { User } from '@supabase/supabase-js'
 import { authenticate, configured, getState, loadWordPage, localPlay, roomStorageKey, rpc, supabase } from '../lib/supabase'
 import type { GameState, Mode, Stake, Variant } from '../lib/game'
 
@@ -7,6 +8,7 @@ export function useGame() {
   const [roomId, setRoomId] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY))
   const [game, setGame] = useState<GameState | null>(null)
   const [userId, setUserId] = useState('')
+  const [account, setAccount] = useState<User | null>(null)
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(Boolean(roomId && configured))
   const [error, setError] = useState('')
@@ -24,6 +26,12 @@ export function useGame() {
     setClockOffset(Date.parse(state.server_now) - Date.now())
     setGame(previous => previous?.room.id === id && previous.room.version > state.room.version ? previous : state)
     setSyncError('')
+  }, [])
+
+  useEffect(() => {
+    if (!supabase) return
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setAccount(session?.user ?? null))
+    return () => subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
@@ -157,5 +165,5 @@ export function useGame() {
     setSyncError('')
     setLoading(false)
   }
-  return { roomId, game, userId, busy, loading, error, syncError, connection, words, clockOffset, createRoom, joinRoom, mutate, home, dismissError: () => setError('') }
+  return { roomId, game, userId, account, busy, loading, error, syncError, connection, words, clockOffset, createRoom, joinRoom, mutate, home, dismissError: () => setError('') }
 }
