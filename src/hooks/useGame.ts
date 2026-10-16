@@ -121,10 +121,10 @@ export function useGame() {
     setLoading(true)
     setRoomId(id)
   }
-  const createRoom = (name: string, mode: Mode, stake: Stake, wager: string, variant: Variant) => action(async () => {
+  const createRoom = (name: string, mode: Mode, stake: Stake, variant: Variant) => action(async () => {
     const id = await authenticate()
     setUserId(id)
-    enterRoom(await rpc<string>('create_room', { p_name: name, p_mode: mode, p_stake: stake, p_wager: wager, p_variant: variant }))
+    enterRoom(await rpc<string>('create_room', { p_name: name, p_mode: mode, p_stake: stake, p_wager: '', p_variant: variant }))
   })
   const joinRoom = (name: string, code: string) => action(async () => {
     const id = await authenticate()

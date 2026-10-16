@@ -13,19 +13,16 @@ async function nameAndInstructions(page: Page, name: string, mode = 'Number Lock
 async function roomPair(a: Page, b: Page, mode = 'Number Lock', turns = false) {
   await nameAndInstructions(a, 'Alice', mode, turns)
   await a.getByRole('button', { name: 'High stakes', exact: true }).click()
-  await a.getByLabel('Your bet', { exact: true }).fill('You make me coffee.')
+  await expect(a.getByLabel('Your bet', { exact: true })).toHaveCount(0)
   await expect(a.getByText(/Next: enter your private/)).toBeVisible()
   await a.getByRole('button', { name: 'Create private room' }).click()
-  await expect(a.getByRole('button', { name: 'Agree & choose secret', exact: true })).toBeDisabled()
+  await expect(a.getByRole('tab', { name: 'The bets', exact: true })).toBeDisabled()
   const code = await a.locator('.room-code-block.large strong').innerText()
   await nameAndInstructions(b, 'Bob', mode, turns, code)
   await b.getByRole('button', { name: 'Join private room' }).click()
   await expect(b.locator('.stake-badge')).toHaveText('High stakes')
-  await b.getByLabel('Your bet', { exact: true }).fill('You bring a snack.')
-  await b.getByRole('button', { name: 'Save bet', exact: true }).click()
   for (const page of [a, b]) {
     await expect(page.getByRole('button', { name: /^Start (game|round)$/ })).toHaveCount(0)
-    await page.getByRole('button', { name: 'Agree & choose secret', exact: true }).click()
     await expect(page.getByLabel(/^Your secret (code|word)$/)).toBeVisible()
     await expect(page.getByLabel('Match bets', { exact: true })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Word bank', exact: true })).toHaveCount(0)
@@ -33,6 +30,12 @@ async function roomPair(a: Page, b: Page, mode = 'Number Lock', turns = false) {
 }
 
 async function start(a: Page, b: Page) {
+  for (const [index, page] of [a, b].entries()) {
+    await expect(page.getByRole('tab', { name: 'The bets', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await page.getByLabel('Your bet', { exact: true }).fill(index === 0 ? 'You make me coffee.' : 'You bring a snack.')
+    await page.getByRole('button', { name: 'Save bet', exact: true }).click()
+  }
+  for (const page of [a, b]) await page.getByRole('button', { name: 'Agree to bets', exact: true }).click()
   await expect(b.getByRole('button', { name: /^Start (game|round)$/ })).toHaveCount(0)
   await a.getByRole('button', { name: /^Start (game|round)$/ }).click()
   await expect(a.getByLabel('Your guess', { exact: true })).toBeVisible()
@@ -59,12 +62,12 @@ for (const mode of ['Number Lock', 'Word Lock']) test(`real local ${mode} create
       expect(secrets.at(-1)).toMatch(mode === 'Word Lock' ? /^[A-Z]{6}$/ : /^\d{4}$/)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
       await page.getByRole('button', { name: 'Lock my secret' }).click()
-      await expect(page.getByRole('heading', { name: 'Your secret is locked.' })).toBeVisible()
-      await expect(page.locator('.room-secret-locked .tile')).toHaveText([...secrets.at(-1)!])
+      await expect(page.getByLabel('Match bets', { exact: true })).toBeVisible()
+      await expect(page.locator('.own-secret .tile')).toHaveText([...secrets.at(-1)!])
     }
     await a.reload()
-    await expect(a.getByRole('heading', { name: 'Your secret is locked.' })).toBeVisible()
-    await expect(a.locator('.room-secret-locked .tile')).toHaveText([...secrets[0]])
+    await expect(a.getByLabel('Match bets', { exact: true })).toBeVisible()
+    await expect(a.locator('.own-secret .tile')).toHaveText([...secrets[0]])
     await start(a, b)
     for (const [index, page] of [a, b].entries()) {
       const ownSecret = page.getByRole('group', { name: mode === 'Word Lock' ? 'Your word' : 'Your code', exact: true })

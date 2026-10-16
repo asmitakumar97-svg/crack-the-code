@@ -20,7 +20,6 @@ export function SetupFlow({ controller, mode, setMode, variant, setVariant }: { 
   const [tab, setTab] = useState<'create' | 'join'>(invite ? 'join' : 'create')
   const [code, setCode] = useState(invite.toUpperCase().slice(0, 6))
   const [stake, setStake] = useState<Stake>('low')
-  const [wager, setWager] = useState('')
   const [error, setError] = useState('')
   useEffect(() => { window.scrollTo(0, 0) }, [step])
   const next = (value: number) => { setError(''); setStep(value) }
@@ -29,8 +28,7 @@ export function SetupFlow({ controller, mode, setMode, variant, setVariant }: { 
     setError('')
     if (!configured) { setError('Connect Supabase first. See the project setup guide.'); return }
     if (tab === 'create') {
-      if (!wager.trim()) { setError('Write what you want if you win.'); return }
-      await controller.createRoom(name.trim(), mode, stake, wager.trim(), variant)
+      await controller.createRoom(name.trim(), mode, stake, variant)
     } else {
       if (!/^[A-F0-9]{6}$/.test(code)) { setError('Enter a six-character room code.'); return }
       await controller.joinRoom(name.trim(), code)
@@ -54,7 +52,7 @@ export function SetupFlow({ controller, mode, setMode, variant, setVariant }: { 
         <button className={variant === 'turns' ? 'selected' : ''} aria-pressed={variant === 'turns'} onClick={() => setVariant('turns')}><Repeat2 size={17} /><strong>Take turns</strong><small>One guess each · keep alternating</small></button>
       </div>
       <ol className="how-to-play" aria-label={`${MODES[mode].name} instructions`}>
-        <li><span>1</span><p>Agree to the bets, then {mode === 'word' ? 'pick a secret six-letter word.' : 'pick a secret four-digit code.'}</p></li>
+        <li><span>1</span><p>{mode === 'word' ? 'Pick a secret six-letter word.' : 'Pick a secret four-digit code.'}<small>Then write your bets, agree and start.</small></p></li>
         <li><span>2</span><p>{variant === 'turns' ? 'Take one guess each. Help mark your friend’s clues.' : 'Guess together and follow the colours.'}<small>Green: right place. Yellow: wrong place. Grey: no match.</small></p></li>
         <li><span>3</span><p>First to crack the code wins.<small>Unlimited guesses. Best of three rounds.</small></p></li>
       </ol>
@@ -66,11 +64,10 @@ export function SetupFlow({ controller, mode, setMode, variant, setVariant }: { 
       <form onSubmit={e => { void enter(e) }}>
         {tab === 'create' ? <>
           <div className="stake-picker" aria-label="Stakes"><button type="button" aria-pressed={stake === 'low'} className={stake === 'low' ? 'selected' : ''} onClick={() => setStake('low')}><Leaf size={20} /><strong>Low stakes</strong></button><button type="button" aria-pressed={stake === 'high'} className={stake === 'high' ? 'selected' : ''} onClick={() => setStake('high')}><Flame size={20} /><strong>High stakes</strong></button></div>
-          <label htmlFor="create-wager">If you win the match…</label><textarea id="create-wager" aria-label="Your bet" rows={2} maxLength={120} placeholder={stake === 'high' ? 'You plan our next adventure.' : 'You make me a coffee.'} value={wager} onChange={e => setWager(e.target.value)} required />
           <div className="chosen-mode"><span>{MODES[mode].name}</span><span>{variant === 'race' ? 'Live race' : 'Take turns'}</span></div>
         </> : <><label htmlFor="join-code">Room code</label><input id="join-code" className="room-code-input" placeholder="A1B2C3" value={code} maxLength={6} autoComplete="off" onChange={e => setCode(e.target.value.toUpperCase().replace(/[^A-F0-9]/g, '').slice(0, 6))} required /><p className="join-description">You’ll get your host’s game and stakes.</p></>}
         {error && <p className="field-error" role="alert">{error}</p>}
-        <button className="button primary full" disabled={controller.busy || tab === 'create' && !wager.trim()} type="submit"><Users size={18} />{tab === 'create' ? 'Create private room' : 'Join private room'}<ArrowRight size={18} /></button>
+        <button className="button primary full" disabled={controller.busy} type="submit"><Users size={18} />{tab === 'create' ? 'Create private room' : 'Join private room'}<ArrowRight size={18} /></button>
         <p className="secret-step-note">Next: enter your private {mode === 'word' ? 'word' : 'code'}, or tap Choose for me.</p>
       </form>
     </section>}
