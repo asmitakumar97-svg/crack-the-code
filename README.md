@@ -2,6 +2,8 @@
 
 An iOS-friendly two-player browser game built with React, TypeScript, Tailwind CSS, Supabase Auth, PostgreSQL and Realtime.
 
+**[Play Crack the Code online](https://asmitakumar97-svg.github.io/crack-the-code/)**
+
 ## What is Supabase?
 
 The React app is the part you see in Safari or a desktop browser. **Supabase is the backend**: a hosted database, anonymous player identities, secure game functions, and live updates between the two players. It stores secrets privately and checks guesses, turns and hints on the server, rather than trusting either player's browser.
