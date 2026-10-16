@@ -15,6 +15,7 @@ const cloudConfigured = Boolean(validUrl(url) && key && !key.includes('YOUR_'))
 export const configured = localPlay || cloudConfigured
 export const supabase = !localPlay && cloudConfigured ? createClient(url, key) : null
 export const roomStorageKey = localPlay ? 'crack-the-code.local.room' : 'crack-the-code.room'
+export const soloStorageKey = localPlay ? 'crack-the-code.local.solo' : 'crack-the-code.solo'
 
 export async function rpc<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {
   if (localPlay) return localRequest<T>(`/rpc/${name}`, args)
@@ -45,7 +46,7 @@ export const getState = (roomId: string) => rpc<GameState>('get_game_state', { p
 export async function loadWordPage(offset: number): Promise<string[]> {
   if (localPlay) return localRequest<string[]>(`/words?offset=${offset}&limit=1000`)
   if (!supabase) throw new Error('Supabase is not configured.')
-  const { data, error } = await supabase.from('word_bank').select('word').order('word').range(offset, offset + 999)
+  const { data, error } = await supabase.from('word_bank').select('word').eq('is_answer', true).order('word').range(offset, offset + 999)
   if (error) throw new Error(`Could not load word bank: ${error.message}. Reopen the room to retry.`)
   return (data ?? []).map((row: { word: string }) => row.word)
 }

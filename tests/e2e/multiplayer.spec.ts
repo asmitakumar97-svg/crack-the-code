@@ -1,42 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test'
 import type { PGlite } from '@electric-sql/pglite'
-import { asUser, call, createDatabase, roomPair as backendPair, start as startGame, user } from '../database'
-
-// Test-only transport backed by the actual migrations, roles and RPCs.
-async function connect(context: BrowserContext, db: PGlite, anonymous = true, existingId?: string) {
-  const id = existingId ?? await user(db)
-  const token = [
-    Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url'),
-    Buffer.from(JSON.stringify({ sub: id, aud: 'authenticated', role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600 })).toString('base64url'),
-    'test-signature',
-  ].join('.')
-  await context.route('http://supabase.test/**', async route => {
-    const request = route.request()
-    const url = new URL(request.url())
-    try {
-      let result: unknown
-      if (url.pathname.startsWith('/auth/')) {
-        result = { access_token: token, refresh_token: 'test-refresh', token_type: 'bearer', expires_in: 3600, user: { id, aud: 'authenticated', role: 'authenticated', is_anonymous: anonymous, created_at: new Date().toISOString(), app_metadata: {}, user_metadata: {} } }
-      } else if (url.pathname === '/rest/v1/word_bank') {
-        const offset = Number(url.searchParams.get('offset') ?? 0)
-        const limit = Number(url.searchParams.get('limit') ?? 1000)
-        result = (await asUser<{ word: string }>(db, id, 'select word from public.word_bank order by word limit $1 offset $2', [limit, offset])).rows
-      } else if (url.pathname.startsWith('/rest/v1/rpc/')) {
-        const fn = url.pathname.split('/').at(-1)!
-        if (!['create_room', 'join_room', 'set_wager', 'set_ready', 'set_secret', 'start_round', 'submit_guess', 'submit_hints', 'advance_round', 'heartbeat', 'get_game_state', 'get_bet_history'].includes(fn)) throw new Error('Unknown RPC')
-        const entries = Object.entries(request.postDataJSON() ?? {})
-        if (entries.some(([key]) => !/^p_[a-z_]+$/.test(key))) throw new Error('Invalid argument')
-        const sql = `select public.${fn}(${entries.map(([key], i) => `${key} => $${i + 1}`).join(',')}) as result`
-        result = (await asUser<{ result: unknown }>(db, id, sql, entries.map(([, value]) => value))).rows[0].result
-      } else throw new Error(`Unexpected request: ${url.pathname}`)
-      await route.fulfill({ json: result, headers: { 'Access-Control-Allow-Origin': '*' } })
-    } catch (err) {
-      await route.fulfill({ status: 400, json: { message: err instanceof Error ? err.message : 'Test transport error', code: 'P0001' } })
-    }
-  })
-  await context.routeWebSocket('**/realtime/v1/websocket*', ws => ws.close())
-  return id
-}
+import { call, createDatabase, roomPair as backendPair, start as startGame } from '../database'
+import { connect } from './transport'
 
 async function secret(page: Page, code: string) {
   await page.getByLabel(/^Your secret (code|word)$/).fill(code)

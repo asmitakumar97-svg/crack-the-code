@@ -3,6 +3,7 @@ export type Variant = 'race' | 'turns'
 export type Mark = 'hit' | 'present' | 'miss'
 export type Stake = 'low' | 'high'
 export type Phase = 'lobby' | 'setting' | 'playing' | 'round_over' | 'match_over'
+export type SoloChallenge = 'attempts' | 'timed'
 
 export const MODES = {
   number: { name: 'Number Lock', label: '01', length: 4, sample: ['3', '7', '1', '9'], detail: '4 digits', keys: '1234567890', description: 'Choose a secret four-digit code. Repeats and leading zeros are allowed.' },
@@ -74,6 +75,20 @@ export interface BetRecord {
   bet: string
   your_score: number
   opponent_score: number
+}
+export interface SoloState {
+  id: string
+  mode: Mode
+  challenge: SoloChallenge
+  status: 'playing' | 'won' | 'lost' | 'abandoned'
+  guesses: Guess[]
+  started_at: string
+  deadline: string | null
+  finished_at: string | null
+  max_guesses: number | null
+  version: number
+  secret: string | null
+  server_now: string
 }
 export function displayItem(_mode: Mode, value: string) {
   return value

@@ -536,3 +536,20 @@ label,.form-label { display: block; font-size: 12px; color: #b0c2d4; font-weight
 :root[data-theme="pastel"] .winner-screen.you-won { background: radial-gradient(ellipse at top,#d7efdf,transparent 75%),#fffdfa; border-color: #8cb69a; }
 :root[data-theme="pastel"] .winner-icon { background: #f9ecd3; border-color: #d5b780; color: #906b28; }
 :root[data-theme="pastel"] .modal::backdrop { background: #30274470; }
+
+.play-mode-picker { display: flex; justify-content: center; gap: 10px; margin: 22px auto; max-width: 480px; }
+.play-mode-picker .button { flex: 1; padding-inline: 10px; font-size: 12px; }
+.solo-shell { max-width: 860px; margin: 0 auto; }
+.solo-setup { padding: 28px; max-width: 480px; margin: 5px auto 25px; }
+.solo-setup h1 { font-size: 32px; margin: 13px 0; }
+.solo-setup > p { font-size: 13px; }
+.solo-setup .mode-picker { margin-top: 24px; }
+.solo-setup .mode-picker button { font-size: 12px; }
+.solo-setup .solo-rules { margin: 20px 0; font-size: 12px; }
+.solo-private-note { font-size: 12px; margin-bottom: 16px; }
+.solo-timer { font-size: 14px; font-weight: 600; }
+.solo-result { margin-bottom: 22px; }
+.solo-result .winner-icon { margin-bottom: 15px; }
+.solo-reveal { width: 100%; max-width: 300px; margin: 25px 0; }
+.solo-reveal > span { display: block; font-size: 12px; margin-bottom: 12px; }
+.solo-arena:not(:has(.input-panel)) { display: block; max-width: 600px; margin: auto; }

@@ -15,6 +15,9 @@ const RPCS = {
   heartbeat: ['p_room'],
   get_game_state: ['p_room'],
   get_bet_history: ['p_before', 'p_before_id', 'p_search', 'p_result'],
+  create_solo_game: ['p_mode', 'p_challenge'],
+  get_solo_game: ['p_game'],
+  submit_solo_guess: ['p_game', 'p_guess', 'p_attempt'],
 } satisfies Record<string, string[]>
 
 class RequestError extends Error {
@@ -95,7 +98,7 @@ export async function createLocalBackend(dataDir?: string) {
       const offset = Number(url.searchParams.get('offset') ?? 0)
       const limit = Number(url.searchParams.get('limit') ?? 1000)
       if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000 || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new RequestError(400, 'Invalid word bank page.')
-      const { rows } = await asPlayer<{ word: string }>(db, id, 'select word from public.word_bank order by word limit $1 offset $2', [limit, offset])
+      const { rows } = await asPlayer<{ word: string }>(db, id, 'select word from public.word_bank where is_answer order by word limit $1 offset $2', [limit, offset])
       send(res, 200, rows.map(row => row.word))
       return
     }

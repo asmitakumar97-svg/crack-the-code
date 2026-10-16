@@ -1,13 +1,15 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ArrowLeft, ArrowRight, Check, CheckCheck, CircleHelp, Clock3, CodeXml, Copy, Flame, Leaf, LoaderCircle, LockKeyhole, Repeat2, Trophy, UserRound, Users, WifiOff, X } from 'lucide-react'
 import { useGame } from './hooks/useGame'
-import { formatTime, getFeedback, MODES, type GameState, type Mark, type Mode, type Player, type Variant } from './lib/game'
+import { formatTime, getFeedback, MODES, type GameState, type Mark, type Mode, type Player, type SoloChallenge, type Variant } from './lib/game'
 import { CLUES, Legend, Tiles } from './components/Tiles'
 import { CodeEntry } from './components/CodeEntry'
 import { ScreenSteps, SetupFlow } from './components/SetupFlow'
-import { localPlay } from './lib/supabase'
+import { localPlay, roomStorageKey } from './lib/supabase'
 import { ThemeControl } from './components/ThemeControl'
 import { PlayerPanel } from './components/PlayerPanel'
+import { SoloGame } from './components/SoloGame'
+import { HistoryPanel } from './components/HistoryPanel'
 
 type Controller = ReturnType<typeof useGame>
 
@@ -17,16 +19,26 @@ export default function App() {
   const [profile, setProfile] = useState(false)
   const [homeMode, setHomeMode] = useState<Mode>('number')
   const [homeVariant, setHomeVariant] = useState<Variant>('race')
+  const [solo, setSolo] = useState(() => !new URLSearchParams(location.search).has('room') && localStorage.getItem(`${roomStorageKey}.play-mode`) === 'solo')
+  const [soloChallenge, setSoloChallenge] = useState<SoloChallenge>('attempts')
+  const [navigationError, setNavigationError] = useState('')
   const { roomId, game, loading, error, syncError } = controller
+  const choosePlay = (solo: boolean) => {
+    setSolo(solo)
+    try { localStorage.setItem(`${roomStorageKey}.play-mode`, solo ? 'solo' : 'multiplayer'); setNavigationError('') }
+    catch { setNavigationError('Your play mode changed, but this browser could not save the preference.') }
+  }
   return <div className="app-shell">
     <header className="site-header"><div className="brand"><span className="brand-icon"><CodeXml size={23} /></span><span>crack<span className="brand-light">the</span>code<span className="mint">.</span></span></div><div className="header-actions"><ThemeControl /><button className="icon-button" aria-label="Player account and bet history" onClick={() => setProfile(true)}><UserRound size={20} /></button><button className="icon-button" aria-label="How to play" onClick={() => setHelp(true)}><CircleHelp size={20} /></button></div></header>
     <main>
       {localPlay && <div className="local-play-notice" role="status"><strong>Local multiplayer</strong><span>Player 2: open this address in a private browser window. Updates every second.</span></div>}
       {(error || syncError) && <div className="error-banner" role="alert"><span>{error || syncError}</span>{error && <button className="icon-button" aria-label="Dismiss error" onClick={controller.dismissError}><X size={17} /></button>}</div>}
-      {!roomId ? <SetupFlow controller={controller} mode={homeMode} setMode={setHomeMode} variant={homeVariant} setVariant={setHomeVariant} /> : !game ? <section className="panel loading-panel">{loading ? <LoaderCircle className="spin mint" size={28} /> : <WifiOff size={28} />}<h1>{loading ? 'Opening your room…' : 'Couldn’t connect'}</h1><button className="button secondary" onClick={controller.home}>Back</button></section> : <Game controller={controller} game={game} onHelp={() => setHelp(true)} />}
+      {navigationError && <p className="field-error" role="alert">{navigationError}</p>}
+      {!roomId && <div className="play-mode-picker" role="group" aria-label="Play mode"><button className={`button ${solo ? 'secondary' : 'primary'}`} aria-pressed={!solo} disabled={controller.busy} onClick={() => choosePlay(false)}>Play with a friend</button><button className={`button ${solo ? 'primary' : 'secondary'}`} aria-pressed={solo} disabled={controller.busy} onClick={() => choosePlay(true)}>Play solo</button></div>}
+      {!roomId ? solo ? <SoloGame userId={controller.userId} mode={homeMode} challenge={soloChallenge} onModeChange={setHomeMode} onChallengeChange={setSoloChallenge} onHelp={() => setHelp(true)} onHome={() => choosePlay(false)} /> : <SetupFlow controller={controller} mode={homeMode} setMode={setHomeMode} variant={homeVariant} setVariant={setHomeVariant} /> : !game ? <section className="panel loading-panel">{loading ? <LoaderCircle className="spin mint" size={28} /> : <WifiOff size={28} />}<h1>{loading ? 'Opening your room…' : 'Couldn’t connect'}</h1><button className="button secondary" onClick={controller.home}>Back</button></section> : <Game controller={controller} game={game} onHelp={() => setHelp(true)} />}
     </main>
-    {help && <Rules mode={game?.room.mode ?? homeMode} turns={(game?.room.variant ?? homeVariant) === 'turns'} onClose={() => setHelp(false)} />}
-    {profile && <Modal title="Your player & bets" onClose={() => setProfile(false)}><PlayerPanel userId={controller.userId} inRoom={Boolean(roomId)} /></Modal>}
+    {help && <Rules mode={game?.room.mode ?? homeMode} turns={(game?.room.variant ?? homeVariant) === 'turns'} solo={!roomId && solo ? soloChallenge : undefined} onClose={() => setHelp(false)} />}
+    {profile && <Modal title="Your player & bets" onClose={() => setProfile(false)}><PlayerPanel userId={controller.userId} inRoom={Boolean(roomId) || solo} /></Modal>}
   </div>
 }
 
@@ -134,9 +146,7 @@ function Arena({ controller, game, me, opponent, elapsed, onHelp }: { controller
             <div className="waiting-state"><LockKeyhole size={28} /><p>{opponent.name} is choosing a guess.</p><LoaderCircle className="spin mint" size={20} /></div>}
       <div className="progress-line"><span>Your guesses: {me.attempts}</span><span>{opponent.name}: {opponent.attempts}</span></div>
     </section>
-    <section className="panel history-panel"><div className="history-heading"><h2>Your guesses</h2><button className="icon-button" aria-label="Explain clues" onClick={onHelp}><CircleHelp size={17} /></button></div><Legend /><div className="guess-history" aria-label="Guess history" aria-live="polite">
-      {game.guesses.length === 0 ? <p className="empty-history">Your clues will appear here.</p> : game.guesses.map(guess => <div className="history-row" key={guess.id}><span>{guess.attempt}</span><Tiles mode={game.room.mode} value={guess.guess} marks={guess.feedback} length={MODES[game.room.mode].length} animated /><small>{game.room.variant === 'race' ? formatTime(guess.elapsed_ms / 1000) : `#${guess.attempt}`}</small></div>)}
-    </div></section>
+    <HistoryPanel mode={game.room.mode} guesses={game.guesses} timed={game.room.variant === 'race'} onHelp={onHelp} />
   </div>
 }
 
@@ -199,6 +209,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   return <dialog ref={ref} aria-labelledby={titleId} className="modal panel" onCancel={onClose} onClick={e => { if (e.target === e.currentTarget) onClose() }}><div className="modal-heading"><h2 id={titleId}>{title}</h2><button className="icon-button" aria-label="Close dialog" onClick={onClose}><X size={20} /></button></div>{children}</dialog>
 }
 
-function Rules({ mode, turns, onClose }: { mode: Mode; turns: boolean; onClose: () => void }) {
+function Rules({ mode, turns, solo, onClose }: { mode: Mode; turns: boolean; solo?: SoloChallenge; onClose: () => void }) {
+  if (solo) return <Modal title={`Solo ${MODES[mode].name}`} onClose={onClose}><p>The game picks a hidden {mode === 'word' ? 'common six-letter English word' : 'four-digit code, including repeats and leading zeros'}. You guess; the game checks and colours each tile automatically.</p><Legend /><p>{solo === 'attempts' ? 'Solve in six guesses or fewer. There is no timer.' : 'Solve before the three-minute timer expires. Guesses are unlimited, and leaving or reloading does not pause the timer.'}</p><p>Exact positions use matching copies first; remaining copies become yellow. Any valid word or code is allowed, regardless of earlier clues. The answer is revealed only after you finish. No room or bet is needed.</p><button className="button primary full" onClick={onClose}>Got it <Check size={17} /></button></Modal>
   return <Modal title={`How to play ${MODES[mode].name}`} onClose={onClose}><p>Choose and lock your secrets first. The bets screen opens automatically: write your bets, both agree, then the host starts there. {MODES[mode].description}</p><Legend /><p>Use the colours to find your friend’s secret. Repeated letters and digits only count as many times as they appear.</p><p>{turns ? 'One guess each, taking turns until someone wins. Tap matching tiles in your friend’s guess: the game picks green or yellow. Check & send hints flags missed matches before the server verifies and shares the clues. The starting player swaps each round. There is no timer.' : 'Both players guess together. The timer shows how long you have been playing; there is no deadline.'}</p><p>Unlimited guesses. The first exact answer stops both players and reveals both secrets. Both choose to continue before picking new secrets. Best of three rounds; bets are agreed once per match.</p><button className="button primary full" onClick={onClose}>Got it <Check size={17} /></button></Modal>
 }
