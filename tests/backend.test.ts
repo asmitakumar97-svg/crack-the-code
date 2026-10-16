@@ -1,0 +1,336 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import type { PGlite } from '@electric-sql/pglite'
+import { asUser, call, createDatabase, launch, roomPair, start, state, user } from './database'
+import { validateEntry } from '../src/lib/game'
+
+let db: PGlite
+beforeAll(async () => { db = await createDatabase() })
+afterAll(async () => { await db?.close() })
+
+describe('non-positional, duplicate-safe feedback', () => {
+  it.each([
+    ['1122', '1111', ['hit', 'hit', 'miss', 'miss']],
+    ['1122', '2211', ['hit', 'hit', 'hit', 'hit']],
+    ['1234', '4444', ['hit', 'miss', 'miss', 'miss']],
+    ['MINT', 'TIME', ['hit', 'hit', 'hit', 'miss']],
+    ['AABB', 'ABAA', ['hit', 'hit', 'hit', 'miss']],
+    ['0000', '0000', ['hit', 'hit', 'hit', 'hit']],
+    ['TREE', 'EELS', ['hit', 'hit', 'miss', 'miss']],
+  ])('scores secret %s / guess %s without position clues', async (secret, guess, expected) => {
+    const result = await db.query<{ marks: string[] }>('select private.feedback($1,$2) as marks', [secret, guess])
+    expect(result.rows[0].marks).toEqual(expected)
+  })
+  it('matches an independent multiset oracle for all 6,561 four-item pairs', async () => {
+    const codes = Array.from({ length: 81 }, (_, n) => n.toString(3).padStart(4, '0'))
+    const results = await db.query<{ secret: string; guess: string; marks: string[] }>(`
+      select secret,guess,private.feedback(secret,guess) as marks
+      from unnest($1::text[]) as secret cross join unnest($1::text[]) as guess
+    `, [codes])
+    for (const { secret, guess, marks } of results.rows) {
+      const matches = [...'012'].reduce((sum, c) => sum + Math.min([...secret].filter(x => x === c).length, [...guess].filter(x => x === c).length), 0)
+      expect(marks.filter(m => m === 'hit')).toHaveLength(matches)
+      expect(marks.every(m => m === 'hit' || m === 'miss')).toBe(true)
+      const permuted = [...secret].reverse().join('')
+      const oracle = [...guess].map((char, i) => [...guess.slice(0, i + 1)].filter(c => c === char).length <= [...permuted].filter(c => c === char).length ? 'hit' : 'miss')
+      expect(marks).toEqual(oracle)
+    }
+  })
+})
+
+describe('wagers, consent, authentication and privacy', () => {
+  it('requires auth and valid names, modes and stakes', async () => {
+    const a = await user(db)
+    await expect(call(db, a, 'create_room', ['', 'number'])).rejects.toThrow('Display name')
+    await expect(call(db, a, 'create_room', ['Alice', 'symbol'])).rejects.toThrow('Number Lock or Word Lock')
+    await expect(call(db, a, 'create_room', ['Alice', 'number', 'money'])).rejects.toThrow('low or high')
+    await expect(call(db, '', 'create_room', ['Alice', 'number'])).rejects.toThrow('Sign in')
+    await expect(db.transaction(async tx => {
+      await tx.exec('set local role anon')
+      await tx.query("select public.create_room('Guest','number','low','Coffee','race')")
+    })).rejects.toThrow('permission denied')
+  })
+  it('requires both written bets, and editing either invalidates both agreements', async () => {
+    const a = await user(db)
+    const b = await user(db)
+    const room = await call<string>(db, a, 'create_room', ['Alice', 'number', 'high'])
+    const code = (await state(db, a, room)).room.code
+    await call(db, b, 'join_room', [code, 'Bob'])
+    await expect(call(db, a, 'set_ready', [room, true])).rejects.toThrow('write a bet')
+    await call(db, a, 'set_wager', [room, 'You plan a day out.'])
+    await call(db, b, 'set_wager', [room, 'You cook dinner.'])
+    await call(db, a, 'set_secret', [room, '1122'])
+    await call(db, b, 'set_secret', [room, '3344'])
+    await call(db, a, 'set_ready', [room, true])
+    const oldRevision = (await state(db, a, room)).room.wager_version
+    await call(db, b, 'set_wager', [room, 'You choose our next adventure.'])
+    expect((await state(db, a, room)).players.every(p => !p.ready)).toBe(true)
+    await expect(call(db, a, 'set_ready', [room, true, oldRevision])).rejects.toThrow('bets changed')
+    await call(db, a, 'set_ready', [room, true])
+    await call(db, b, 'set_ready', [room, true])
+    expect((await state(db, a, room)).room.status).toBe('lobby')
+    await call(db, a, 'start_round', [room])
+    expect((await state(db, a, room)).room.status).toBe('playing')
+    await expect(call(db, a, 'set_wager', [room, 'A different bet.'])).rejects.toThrow('locked')
+  })
+  it('allows only two room members and validates written bets', async () => {
+    const pair = await roomPair(db)
+    const c = await user(db)
+    expect((await call<{ error: string }>(db, c, 'join_room', [pair.code, 'Eve'])).error).toContain('full')
+    await expect(call(db, pair.a, 'set_wager', [pair.room, ''])).rejects.toThrow('1–120')
+    await expect(call(db, pair.a, 'set_wager', [pair.room, 'x'.repeat(121)])).rejects.toThrow('1–120')
+    await call(db, pair.a, 'set_secret', [pair.room, '1234'])
+    expect((await state(db, pair.a, pair.room)).own_secret).toBe('1234')
+    expect((await state(db, pair.a, pair.room)).room.status).toBe('lobby')
+  })
+  it('never exposes active opponent secrets, guesses, or draft bets', async () => {
+    const pair = await roomPair(db)
+    await start(db, pair)
+    const c = await user(db)
+    await call(db, pair.a, 'submit_guess', [pair.room, '1111', 1])
+    const view = await state(db, pair.a, pair.room)
+    expect(view.own_secret).toBe('1122')
+    expect(view.results).toEqual([])
+    expect((await state(db, pair.b, pair.room)).guesses).toEqual([])
+    expect((await asUser<{ code: string }>(db, pair.a, 'select code from public.secrets')).rows).toEqual([{ code: '1122' }])
+    for (const table of ['rooms', 'players', 'secrets', 'guesses', 'round_results']) {
+      expect((await asUser(db, c, `select * from public.${table}`)).rows).toEqual([])
+    }
+    await expect(state(db, c, pair.room)).rejects.toThrow('not a member')
+    await expect(call(db, c, 'set_secret', [pair.room, '0000'])).rejects.toThrow('not a member')
+    await expect(asUser(db, pair.a, 'update public.players set score=999 where room_id=$1', [pair.room])).rejects.toThrow('permission denied')
+    await expect(asUser(db, pair.a, "insert into public.secrets values($1,$2,1,1,'9999')", [pair.room, pair.a])).rejects.toThrow('permission denied')
+    await expect(asUser(db, pair.a, "select private.feedback('1234','1111')")).rejects.toThrow('permission denied')
+  })
+  it('rate-limits failed joins without rolling back the rate-limit write', async () => {
+    const c = await user(db)
+    for (let i = 0; i < 30; i++) expect((await call<{ error: string }>(db, c, 'join_room', ['XXXXXX', 'Guest'])).error).toContain('not found')
+    expect((await call<{ error: string }>(db, c, 'join_room', ['XXXXXX', 'Guest'])).error).toContain('Too many')
+  })
+  it('starts neither player before both secrets and the shared start timestamp', async () => {
+    const pair = await roomPair(db)
+    await expect(call(db, pair.b, 'set_ready', [pair.room, true])).rejects.toThrow('Lock your secret')
+    await call(db, pair.a, 'set_secret', [pair.room, '0011'])
+    await expect(call(db, pair.a, 'set_secret', [pair.room, '1234'])).rejects.toThrow('already locked')
+    await expect(call(db, pair.a, 'submit_guess', [pair.room, '3344', 1])).rejects.toThrow('not accepting')
+    await call(db, pair.b, 'set_secret', [pair.room, '3344'])
+    expect((await state(db, pair.a, pair.room)).room.status).toBe('lobby')
+    await expect(call(db, pair.b, 'start_round', [pair.room])).rejects.toThrow('Only the room creator')
+    await expect(call(db, pair.a, 'start_round', [pair.room])).rejects.toThrow('get ready')
+    await call(db, pair.b, 'set_ready', [pair.room, true])
+    await call(db, pair.a, 'start_round', [pair.room])
+    const aState = await state(db, pair.a, pair.room)
+    const bState = await state(db, pair.b, pair.room)
+    expect(aState.room.started_at).toBe(bState.room.started_at)
+    expect(Date.parse(aState.room.started_at!)).toBeGreaterThan(Date.parse(aState.server_now))
+    await expect(call(db, pair.a, 'submit_guess', [pair.room, '3344', 1])).rejects.toThrow('starts in a moment')
+  })
+})
+
+describe('first-to-finish races and best of three', () => {
+  it('awards an immediate win to the first solve, not the player with fewer attempts', async () => {
+    const pair = await roomPair(db)
+    await start(db, pair)
+    await call(db, pair.a, 'submit_guess', [pair.room, '0000', 1])
+    await call(db, pair.a, 'submit_guess', [pair.room, '3344', 2])
+    const view = await state(db, pair.a, pair.room)
+    expect(view.room.status).toBe('round_over')
+    expect(view.results[0].winner_id).toBe(pair.a)
+    expect(view.players.find(p => p.user_id === pair.a)?.score).toBe(1)
+    expect(view.players.find(p => p.user_id === pair.b)?.attempts).toBe(0)
+    expect(view.results[0].reveals[pair.b]).toBe('3344')
+    expect(await call(db, pair.b, 'submit_guess', [pair.room, '1122', 1])).toEqual({ accepted: false, reason: 'round_finished' })
+  })
+  it('does not mistake four matching items in a different order for a solve', async () => {
+    const pair = await roomPair(db)
+    await start(db, pair)
+    await call(db, pair.a, 'submit_guess', [pair.room, '4433', 1])
+    const view = await state(db, pair.a, pair.room)
+    expect(view.guesses[0].feedback).toEqual(['hit', 'hit', 'hit', 'hit'])
+    expect(view.players.find(p => p.user_id === pair.a)?.solved).toBe(false)
+    expect(view.room.status).toBe('playing')
+  })
+  it('serializes simultaneous exact guesses into one winner', async () => {
+    const pair = await roomPair(db)
+    await start(db, pair)
+    const results = await Promise.all([
+      call<{ accepted: boolean }>(db, pair.a, 'submit_guess', [pair.room, '3344', 1]),
+      call<{ accepted: boolean }>(db, pair.b, 'submit_guess', [pair.room, '1122', 1]),
+    ])
+    expect(results.filter(r => r.accepted)).toHaveLength(1)
+    const view = await state(db, pair.a, pair.room)
+    expect(view.results).toHaveLength(1)
+    expect(view.players.filter(p => p.solved)).toHaveLength(1)
+    expect(view.players.reduce((sum, p) => sum + p.score, 0)).toBe(1)
+  })
+  it('caps attempts at eight, rejects duplicate requests and draws when both run out', async () => {
+    const pair = await roomPair(db)
+    await start(db, pair)
+    await call(db, pair.a, 'submit_guess', [pair.room, '0000', 1])
+    await expect(call(db, pair.a, 'submit_guess', [pair.room, '0000', 1])).rejects.toThrow('out of date')
+    for (let i = 2; i <= 8; i++) await call(db, pair.a, 'submit_guess', [pair.room, '0000', i])
+    await expect(call(db, pair.a, 'submit_guess', [pair.room, '3344', 9])).rejects.toThrow('eight guesses')
+    for (let i = 1; i <= 8; i++) await call(db, pair.b, 'submit_guess', [pair.room, '9999', i])
+    const view = await state(db, pair.a, pair.room)
+    expect(view.results[0].winner_id).toBeNull()
+    expect(view.players.map(p => p.score)).toEqual([0, 0])
+    expect(view.guesses).toHaveLength(8)
+  })
+  it.each([[true, true], [true, false, true]])('ends the match at two wins and resets bets only on rematch: %j', async (...wins) => {
+    const pair = await roomPair(db)
+    await start(db, pair)
+    const originalBets = (await state(db, pair.a, pair.room)).players.map(p => p.wager)
+    for (let round = 1; round <= wins.length; round++) {
+      const aWins = wins[round - 1]
+      await call(db, aWins ? pair.a : pair.b, 'submit_guess', [pair.room, aWins ? '3344' : '1122', 1])
+      const view = await state(db, pair.a, pair.room)
+      expect(view.room.status).toBe(round === wins.length ? 'match_over' : 'round_over')
+      expect(view.players.map(p => p.wager)).toEqual(originalBets)
+      await call(db, pair.a, 'advance_round', [pair.room])
+      expect((await state(db, pair.a, pair.room)).room.status).toBe(view.room.status)
+      await call(db, pair.b, 'advance_round', [pair.room])
+      const next = await state(db, pair.a, pair.room)
+      expect(next.guesses).toEqual([])
+      expect(next.own_secret).toBeNull()
+      if (round < wins.length) {
+        await call(db, pair.a, 'set_secret', [pair.room, '1122'])
+        await call(db, pair.b, 'set_secret', [pair.room, '3344'])
+        await launch(db, pair)
+      } else {
+        expect(next.room.status).toBe('lobby')
+        expect(next.room.round_number).toBe(1)
+        expect(next.room.match_number).toBe(2)
+        expect(next.players.every(p => !p.wager && p.score === 0 && !p.ready)).toBe(true)
+        expect(next.results).toEqual([])
+      }
+    }
+  })
+  it('rejects requests delayed from an earlier round or match', async () => {
+    const pair = await roomPair(db)
+    await start(db, pair)
+    await call(db, pair.a, 'submit_guess', [pair.room, '3344', 1])
+    await call(db, pair.a, 'advance_round', [pair.room])
+    await call(db, pair.b, 'advance_round', [pair.room])
+    await expect(call(db, pair.a, 'set_secret', [pair.room, '9999', 1, 1])).rejects.toThrow('Round out of date')
+    await expect(call(db, pair.a, 'set_wager', [pair.room, 'Old request', 0])).rejects.toThrow('Match out of date')
+  })
+  it('has no time limit and supports elapsed durations longer than 32-bit milliseconds', async () => {
+    const pair = await roomPair(db)
+    await start(db, pair)
+    await db.query("update public.rooms set started_at=now()-interval '30 days',created_at=now()-interval '31 days' where id=$1", [pair.room])
+    await call(db, pair.a, 'heartbeat', [pair.room])
+    expect((await state(db, pair.a, pair.room)).room.status).toBe('playing')
+    await call(db, pair.a, 'submit_guess', [pair.room, '3344', 1])
+    expect((await state(db, pair.a, pair.room)).guesses[0].elapsed_ms).toBeGreaterThan(2_147_483_647)
+  })
+  it.each([
+    ['word', ['TREE', 'MINT'], 'TIME', ['hit', 'hit', 'hit', 'miss']],
+    ['number', ['1122', '3344'], '3333', ['hit', 'hit', 'miss', 'miss']],
+  ] as const)('validates and plays %s mode', async (mode, codes, guess, marks) => {
+    const pair = await roomPair(db, mode)
+    await start(db, pair, [...codes])
+    await expect(call(db, pair.a, 'submit_guess', [pair.room, 'XXXXX', 1])).rejects.toThrow('Enter four')
+    await call(db, pair.a, 'submit_guess', [pair.room, guess, 1])
+    expect((await state(db, pair.a, pair.room)).guesses[0].feedback).toEqual(marks)
+  })
+  it('contains real four-letter words only, with no five-letter legacy entries', async () => {
+    const words = (await db.query<{ word: string }>('select word from public.word_bank')).rows.map(r => r.word)
+    expect(words.length).toBeGreaterThan(500)
+    expect(words).toEqual(expect.arrayContaining(['MINT', 'TREE', 'BOOK', 'CODE', 'TIME', 'LOVE']))
+    for (const word of words) {
+      expect(word).toMatch(/^[A-Z]{4}$/)
+      expect(validateEntry('word', word, words)).toBeNull()
+    }
+    expect(words).not.toContain('APPLE')
+  })
+  it('publishes rooms only, never guesses or secrets', async () => {
+    const tables = await db.query<{ tablename: string }>("select tablename from pg_publication_tables where pubname='supabase_realtime'")
+    expect(tables.rows.map(r => r.tablename)).toEqual(['rooms'])
+  })
+})
+
+describe('host-controlled setup and protected manual turns', () => {
+  it('requires the host bet at creation and shares the host configuration with the guest', async () => {
+    const a = await user(db)
+    const b = await user(db)
+    await expect(call(db, a, 'create_room', ['Alice', 'number', 'high', '', 'turns'])).rejects.toThrow('Write a bet')
+    await expect(call(db, a, 'create_room', ['Alice', 'number', 'high', 'Coffee', 'invalid'])).rejects.toThrow('turn-by-turn')
+    const room = await call<string>(db, a, 'create_room', ['Alice', 'word', 'high', 'A day out.', 'turns'])
+    const hostState = await state(db, a, room)
+    await call(db, b, 'join_room', [hostState.room.code, 'Bob'])
+    const guestState = await state(db, b, room)
+    expect(guestState.room.stake).toBe('high')
+    expect(guestState.room.variant).toBe('turns')
+    expect(guestState.room.mode).toBe('word')
+    await expect(asUser(db, b, "update public.rooms set stake='low',variant='race' where id=$1", [room])).rejects.toThrow('permission denied')
+  })
+  it('blocks false, self-authored and replayed hints and never exposes unchecked feedback', async () => {
+    const pair = await roomPair(db, 'number', 'turns')
+    await start(db, pair)
+    expect((await state(db, pair.a, pair.room)).room.turn_user_id).toBe(pair.a)
+    await expect(call(db, pair.b, 'submit_guess', [pair.room, '1122', 1])).rejects.toThrow('opponent')
+    await call(db, pair.a, 'submit_guess', [pair.room, '3333', 1])
+    const attackerState = await state(db, pair.a, pair.room)
+    const defenderState = await state(db, pair.b, pair.room)
+    const pending = attackerState.pending_guess!
+    expect(pending.guess).toBe('3333')
+    expect(pending).not.toHaveProperty('feedback')
+    expect(attackerState.guesses).toEqual([])
+    expect(defenderState.pending_guess).toEqual(pending)
+    expect((await asUser(db, pair.a, 'select * from public.guesses where room_id=$1', [pair.room])).rows).toEqual([])
+    await expect(asUser(db, pair.a, 'select * from private.pending_guesses')).rejects.toThrow('permission denied')
+    await expect(call(db, pair.a, 'submit_guess', [pair.room, '3344', 2])).rejects.toThrow('Wait for')
+    await expect(call(db, pair.a, 'submit_hints', [pair.room, pending.id, ['hit', 'hit', 'miss', 'miss']])).rejects.toThrow('secret owner')
+    await expect(call(db, pair.b, 'submit_hints', [pair.room, pending.id, ['miss', 'miss', 'miss', 'miss']])).rejects.toThrow('do not match')
+    await expect(call(db, pair.b, 'submit_hints', [pair.room, pending.id, ['hit', 'hit']])).rejects.toThrow('do not match')
+    expect((await state(db, pair.a, pair.room)).guesses).toEqual([])
+    expect((await state(db, pair.a, pair.room)).pending_guess?.id).toBe(pending.id)
+    await call(db, pair.b, 'submit_hints', [pair.room, pending.id, ['hit', 'hit', 'miss', 'miss']])
+    const checked = await state(db, pair.a, pair.room)
+    expect(checked.guesses[0].feedback).toEqual(['hit', 'hit', 'miss', 'miss'])
+    expect(checked.pending_guess).toBeNull()
+    expect(checked.room.turn_user_id).toBe(pair.b)
+    expect((await state(db, pair.b, pair.room)).guesses).toEqual([])
+    await expect(call(db, pair.b, 'submit_hints', [pair.room, pending.id, ['hit', 'hit', 'miss', 'miss']])).rejects.toThrow('already been checked')
+    await call(db, pair.b, 'submit_guess', [pair.room, '1122', 1])
+    expect((await state(db, pair.a, pair.room)).results[0].winner_id).toBe(pair.b)
+  })
+  it('validates manual word hints and repeated letters without revealing positions', async () => {
+    const pair = await roomPair(db, 'word', 'turns')
+    await start(db, pair, ['MINT', 'TREE'])
+    await call(db, pair.a, 'submit_guess', [pair.room, 'TEEM', 1])
+    const pending = (await state(db, pair.b, pair.room)).pending_guess!
+    await expect(call(db, pair.b, 'submit_hints', [pair.room, pending.id, ['hit', 'miss', 'hit', 'hit']])).rejects.toThrow('do not match')
+    await call(db, pair.b, 'submit_hints', [pair.room, pending.id, ['hit', 'hit', 'hit', 'miss']])
+    expect((await state(db, pair.a, pair.room)).guesses[0].feedback).toEqual(['hit', 'hit', 'hit', 'miss'])
+  })
+  it('alternates the opening player each round and still requires host start', async () => {
+    const pair = await roomPair(db, 'number', 'turns')
+    await start(db, pair)
+    await call(db, pair.a, 'submit_guess', [pair.room, '3344', 1])
+    expect((await state(db, pair.a, pair.room)).pending_guess).toBeNull()
+    await call(db, pair.a, 'advance_round', [pair.room])
+    await call(db, pair.b, 'advance_round', [pair.room])
+    await call(db, pair.a, 'set_secret', [pair.room, '1122'])
+    await call(db, pair.b, 'set_secret', [pair.room, '3344'])
+    expect((await state(db, pair.a, pair.room)).room.status).toBe('setting')
+    await launch(db, pair)
+    expect((await state(db, pair.a, pair.room)).room.turn_user_id).toBe(pair.b)
+  })
+  it('draws only after both players use eight guesses and the last hints are checked', async () => {
+    const pair = await roomPair(db, 'number', 'turns')
+    await start(db, pair)
+    for (let attempt = 1; attempt <= 8; attempt++) {
+      for (const [guesser, defender, guess] of [[pair.a, pair.b, '0000'], [pair.b, pair.a, '9999']]) {
+        await call(db, guesser, 'submit_guess', [pair.room, guess, attempt])
+        const pendingState = await state(db, defender, pair.room)
+        expect(pendingState.room.status).toBe('playing')
+        await call(db, defender, 'submit_hints', [pair.room, pendingState.pending_guess!.id, ['miss', 'miss', 'miss', 'miss']])
+      }
+    }
+    const final = await state(db, pair.a, pair.room)
+    expect(final.room.status).toBe('round_over')
+    expect(final.results[0].winner_id).toBeNull()
+    expect(final.guesses).toHaveLength(8)
+    expect(final.pending_guess).toBeNull()
+  })
+})
