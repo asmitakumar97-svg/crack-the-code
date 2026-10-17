@@ -5,6 +5,7 @@ import { googleAuthEnabled, localPlay, rpc, supabase } from '../lib/supabase'
 import { MODES, type BetRecord } from '../lib/game'
 import { getGooglePhoto } from '../lib/avatars'
 import { PlayerAvatar } from './PlayerAvatar'
+import { disablePhonePush } from '../lib/push'
 
 export function PlayerPanel({ userId, inRoom, user }: { userId: string; inRoom: boolean; user: User | null }) {
   const [authBusy, setAuthBusy] = useState(false)
@@ -18,6 +19,7 @@ export function PlayerPanel({ userId, inRoom, user }: { userId: string; inRoom: 
     setAuthBusy(true)
     setError('')
     try {
+      await disablePhonePush()
       const redirectTo = new URL(import.meta.env.BASE_URL, location.origin).href
       if (signOut) {
         const { error } = await supabase.auth.signOut({ scope: 'local' })

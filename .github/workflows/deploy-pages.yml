@@ -19,6 +19,7 @@ jobs:
       VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
       VITE_GOOGLE_AUTH_ENABLED: ${{ vars.VITE_GOOGLE_AUTH_ENABLED }}
+      VITE_PHONE_PUSH_ENABLED: ${{ vars.VITE_PHONE_PUSH_ENABLED }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

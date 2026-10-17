@@ -1,0 +1,2 @@
+[functions.turn-push]
+verify_jwt = false

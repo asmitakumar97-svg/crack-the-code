@@ -612,6 +612,12 @@ label,.form-label { display: block; font-size: 12px; color: #b0c2d4; font-weight
   .landing-sticker { right: 3px; }
 }
 .solo-shell { max-width: 860px; margin: 0 auto; }
+.turn-alerts { max-width: 580px; margin: 0 auto 18px; padding: 12px 15px; border: 1px solid #34445c; border-radius: 13px; }
+.turn-alerts .button { min-height: 44px; font-size: 12px; }
+.turn-alerts > p { font-size: 11px; margin-top: 8px; }
+.phone-push-control { border-top: 1px solid #8e93aa44; margin-top: 14px; padding-top: 14px; }
+.phone-push-control p { font-size: 11px; margin-top: 8px; }
+:root[data-theme="pastel"] .turn-alerts { border-color: #d9cee7; background: #fffdfa; }
 .solo-setup { padding: 28px; max-width: 480px; margin: 5px auto 25px; }
 .solo-setup h1 { font-size: 32px; margin: 13px 0; }
 .solo-setup > p { font-size: 13px; }

@@ -10,7 +10,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:local": "playwright test --config playwright.local.config.ts"
+    "test:local": "playwright test --config playwright.local.config.ts",
+    "test:push": "playwright test --config playwright.push.config.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
@@ -29,6 +30,7 @@
     "@vitejs/plugin-react": "^5.0.3",
     "typescript": "~5.9.2",
     "vite": "^7.1.7",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "web-push": "3.6.7"
   }
 }

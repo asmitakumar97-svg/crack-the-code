@@ -5,7 +5,10 @@ import type { GameState, Mode, Stake, Variant } from '../lib/game'
 
 const STORAGE_KEY = roomStorageKey
 export function useGame() {
-  const [roomId, setRoomId] = useState<string | null>(() => localStorage.getItem(STORAGE_KEY))
+  const [roomId, setRoomId] = useState<string | null>(() => {
+    const notifiedRoom = new URLSearchParams(location.search).get('notificationRoom')
+    return notifiedRoom && /^[a-f0-9-]{36}$/.test(notifiedRoom) ? notifiedRoom : localStorage.getItem(STORAGE_KEY)
+  })
   const [game, setGame] = useState<GameState | null>(null)
   const [userId, setUserId] = useState('')
   const [account, setAccount] = useState<User | null>(null)
@@ -23,6 +26,7 @@ export function useGame() {
   const refresh = useCallback(async (id: string) => {
     const state = await getState(id)
     if (currentRoom.current !== id) return
+    if (localStorage.getItem(STORAGE_KEY) !== id) localStorage.setItem(STORAGE_KEY, id)
     setClockOffset(Date.parse(state.server_now) - Date.now())
     setGame(previous => previous?.room.id === id && previous.room.version > state.room.version ? previous : state)
     setSyncError('')

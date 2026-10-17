@@ -16,6 +16,7 @@ export async function openGameDatabase(dataDir?: string) {
       if (!rows[0].exists) await tx.exec(`
         create role anon nologin;
         create role authenticated nologin;
+        create role service_role nologin;
         create schema auth;
         create table auth.users(id uuid primary key);
         create function auth.uid() returns uuid language sql stable as
@@ -25,6 +26,9 @@ export async function openGameDatabase(dataDir?: string) {
         create publication supabase_realtime;
       `)
       await tx.exec(`
+        do $$ begin
+          if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role nologin; end if;
+        end $$;
         alter table auth.users add column if not exists raw_user_meta_data jsonb not null default '{}'::jsonb;
         alter table auth.users add column if not exists raw_app_meta_data jsonb not null default '{}'::jsonb;
         alter table auth.users add column if not exists is_anonymous boolean not null default true;

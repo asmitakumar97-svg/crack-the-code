@@ -13,6 +13,7 @@ import { HistoryPanel } from './components/HistoryPanel'
 import { PlayerAvatar } from './components/PlayerAvatar'
 import { getGooglePhoto } from './lib/avatars'
 import { LandingPage } from './components/LandingPage'
+import { TurnAlerts } from './components/TurnAlerts'
 
 type Controller = ReturnType<typeof useGame>
 type HomeScreen = 'home' | 'friend' | 'solo'
@@ -35,7 +36,7 @@ export default function App() {
     setScreen(next)
     try {
       const url = new URL(location.href)
-      if (next === 'home') { url.searchParams.delete('play'); url.searchParams.delete('room') }
+      if (next === 'home') { url.searchParams.delete('play'); url.searchParams.delete('room'); url.searchParams.delete('notificationRoom') }
       else url.searchParams.set('play', next)
       history.replaceState(null, '', url)
       setNavigationError('')
@@ -74,6 +75,7 @@ function Game({ controller, game, onHelp, onHome }: { controller: Controller; ga
     <div className="scoreboard"><PlayerBadge player={me} you online={controller.connection !== 'offline'} /><div className="score-center"><div><strong>{me.score}</strong><span>:</span><strong>{opponent?.score ?? 0}</strong></div><small>{room.status === 'lobby' ? 'BEST OF THREE' : `ROUND ${room.round_number} / 3`}</small></div>{opponent ? <PlayerBadge player={opponent} online={Boolean(opponentOnline)} /> : <div className="player-badge"><span className="avatar empty"><Users size={21} /></span><strong>Waiting…</strong></div>}</div>
     {controller.connection === 'offline' && <div className="notice"><WifiOff size={16} />You’re offline. Reconnecting…</div>}
     {opponent && !opponentOnline && <div className="notice"><WifiOff size={16} />{opponent.name} is reconnecting.</div>}
+    {room.variant === 'turns' && <TurnAlerts game={game} userId={me.user_id} started={Boolean(room.started_at) && countdown === 0} />}
     {preparing ? <RoomStage key={`${room.match_number}-${room.round_number}`} controller={controller} game={game} me={me} opponent={opponent} /> :
       room.status === 'playing' ? countdown > 0 ? <section className="panel countdown-screen" aria-live="polite"><span className="eyebrow">THE HOST STARTED THE ROUND</span><h1>Get ready.</h1><strong className="countdown-number" key={countdown}>{countdown}</strong><p>You both start together.</p><OwnSecret game={game} /></section> : <Arena key={`${room.match_number}-${room.round_number}`} controller={controller} game={game} me={me} opponent={opponent!} elapsed={elapsed} onHelp={onHelp} /> :
         <Results game={game} me={me} opponent={opponent!} controller={controller} />}

@@ -26,9 +26,9 @@ export async function connect(context: BrowserContext, db: PGlite, anonymous = t
         result = (await asUser<{ word: string }>(db, id, 'select word from public.word_bank where is_answer order by word limit $1 offset $2', [limit, offset])).rows
       } else if (url.pathname.startsWith('/rest/v1/rpc/')) {
         const fn = url.pathname.split('/').at(-1)!
-        if (!['create_room', 'join_room', 'set_wager', 'set_ready', 'set_secret', 'start_round', 'submit_guess', 'submit_hints', 'advance_round', 'heartbeat', 'get_game_state', 'get_bet_history', 'create_solo_game', 'get_solo_game', 'submit_solo_guess'].includes(fn)) throw new Error('Unknown RPC')
+        if (!['create_room', 'join_room', 'set_wager', 'set_ready', 'set_secret', 'start_round', 'submit_guess', 'submit_hints', 'advance_round', 'heartbeat', 'get_game_state', 'get_bet_history', 'create_solo_game', 'get_solo_game', 'submit_solo_guess', 'get_push_settings', 'save_push_subscription', 'remove_push_subscription', 'get_push_subscription_status'].includes(fn)) throw new Error('Unknown RPC')
         const entries = Object.entries(request.postDataJSON() ?? {})
-        if (entries.some(([key]) => !/^p_[a-z_]+$/.test(key))) throw new Error('Invalid argument')
+        if (entries.some(([key]) => !/^p_[a-z][a-z0-9_]*$/.test(key))) throw new Error('Invalid argument')
         const sql = `select public.${fn}(${entries.map(([key], i) => `${key} => $${i + 1}`).join(',')}) as result`
         result = (await asUser<{ result: unknown }>(db, id, sql, entries.map(([, value]) => value))).rows[0].result
       } else throw new Error(`Unexpected request: ${url.pathname}`)
