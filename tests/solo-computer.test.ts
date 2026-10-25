@@ -4,7 +4,7 @@ import { asUser, call, createDatabase, user } from './database'
 import type { Difficulty, DotsState, SoloBoardState } from '../src/lib/game'
 
 let db: PGlite
-type ComputerState = Exclude<SoloBoardState, { kind: 'ring' }>
+type ComputerState = Extract<SoloBoardState, { kind: 'memory' | 'dots' }>
 beforeAll(async () => { db = await createDatabase() })
 afterAll(async () => { await db?.close() })
 const get = (id: string, player: string) => call<ComputerState>(db, player, 'get_solo_board', [id])

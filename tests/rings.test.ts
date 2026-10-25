@@ -14,13 +14,13 @@ function move(rods: number[][], code: number) {
   const copy = rods.map(rod => [...rod]), a = Math.floor(code / 5), b = code % 5
   expect(a).not.toBe(b)
   expect(copy[a].length).toBeGreaterThan(0)
-  expect(copy[b].length).toBeLessThan(5)
+  expect(copy[b].length).toBeLessThan(rods.flat().length / 4)
   const colour = copy[a].at(-1)!
   expect(copy[b].length === 0 || copy[b].at(-1) === colour).toBe(true)
   copy[b].push(copy[a].pop()!)
   return copy
 }
-const sorted = (rods: number[][]) => rods.filter(rod => rod.length === 5 && rod.every(colour => colour === rod[0])).length === 4
+const sorted = (rods: number[][]) => rods.filter(rod => rod.length === rods.flat().length / 4 && rod.every(colour => colour === rod[0])).length === 4
 async function duo() {
   const a = await user(db), b = await user(db)
   const room = await call<string>(db, a, 'create_duo_room', ['Alice'])
@@ -43,17 +43,17 @@ const moveSolo = (g: SoloRing, player: string, code: number, count = g.board.mov
   call<SoloRing>(db, player, 'move_solo_ring', [g.id, count, Math.floor(code / 5), code % 5])
 
 describe('Ring Rush', () => {
-  it('generates varied puzzles with exactly 20 rings, 4 colours × 5, 5 rods, one empty rod and a completely legal solution', async () => {
+  it('generates varied puzzles with exactly 40 beads, 4 colours × 10, 5 rods, one empty rod and a completely legal solution', async () => {
     const puzzles = new Set<string>()
     for (let sample = 0; sample < 100; sample++) {
       const puzzle = (await db.query<{ puzzle: { initial: number[][]; solution: number[] } }>('select private.new_ring_puzzle() as puzzle')).rows[0].puzzle
       expect(puzzle.initial).toHaveLength(5)
-      expect(puzzle.initial.map(rod => rod.length).sort()).toEqual([0, 5, 5, 5, 5])
-      expect(puzzle.initial.flat()).toHaveLength(20)
-      for (let colour = 0; colour < 4; colour++) expect(puzzle.initial.flat().filter(ring => ring === colour)).toHaveLength(5)
+      expect(puzzle.initial.map(rod => rod.length).sort((a, b) => a - b)).toEqual([0, 10, 10, 10, 10])
+      expect(puzzle.initial.flat()).toHaveLength(40)
+      for (let colour = 0; colour < 4; colour++) expect(puzzle.initial.flat().filter(ring => ring === colour)).toHaveLength(10)
       expect(puzzle.initial.filter(rod => new Set(rod).size > 1)).toHaveLength(4)
-      expect(puzzle.solution.length).toBeGreaterThanOrEqual(36)
-      expect(puzzle.solution.length).toBeLessThanOrEqual(42)
+      expect(puzzle.solution.length).toBeGreaterThanOrEqual(72)
+      expect(puzzle.solution.length).toBeLessThanOrEqual(78)
       let rods = puzzle.initial
       for (const code of puzzle.solution) rods = move(rods, code)
       expect(sorted(rods)).toBe(true)
@@ -81,8 +81,8 @@ describe('Ring Rush', () => {
     const p = await duo()
     await startShared(p.room)
     const rods = p.board.boards[p.a], empty = rods.findIndex(rod => !rod.length), full = rods.findIndex(rod => rod.length)
-    const otherFull = rods.findIndex((rod, index) => index !== full && rod.length === 5)
-    await expect(sharedMove(p, p.a, 0, empty * 5 + full)).rejects.toThrow('no rings')
+    const otherFull = rods.findIndex((rod, index) => index !== full && rod.length === 10)
+    await expect(sharedMove(p, p.a, 0, empty * 5 + full)).rejects.toThrow('no beads')
     await expect(sharedMove(p, p.a, 0, full * 5 + otherFull)).rejects.toThrow('full')
     await expect(call(db, p.a, 'move_ring', [p.room, p.board.session_id, 0, -1, 0])).rejects.toThrow('different rods')
     await expect(call(db, p.a, 'move_ring', [p.room, crypto.randomUUID(), 0, full, empty])).rejects.toThrow('different ring race')
@@ -92,6 +92,16 @@ describe('Ring Rush', () => {
     await expect(sharedMove(p, p.a, 0, full * 5 + empty)).rejects.toThrow('rings changed')
     const outsider = await user(db)
     await expect(sharedMove(p, outsider, 0, full * 5 + empty)).rejects.toThrow('not a member')
+  })
+
+  it('preserves the five-bead capacity and completion rules of saved 20-ring races', async () => {
+    const player = await user(db)
+    const rods = [Array(4).fill(0), Array(5).fill(1), Array(5).fill(2), Array(5).fill(3), [0]]
+    const board = { boards: { [player]: rods }, moves: { [player]: 0 }, started_at: new Date(Date.now() - 1000).toISOString(), finished: false }
+    const next = (await db.query<{ board: RingBoard }>('select private.apply_ring_move($1::jsonb,$2,0,4,0) as board', [JSON.stringify(board), player])).rows[0].board
+    expect(next.finished).toBe(true)
+    expect(next.winner_id).toBe(player)
+    expect(sorted(next.boards[player])).toBe(true)
   })
 
   it('lets both players move independently, rejects duplicate actions and declares the first verified finish the winner', async () => {

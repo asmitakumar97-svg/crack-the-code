@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { LogIn, LogOut, RefreshCw } from 'lucide-react'
 import { googleAuthEnabled, localPlay, rpc, supabase } from '../lib/supabase'
-import { MODES, type BetRecord } from '../lib/game'
+import { GAME_NAMES, MODES, NO_BET, type BetRecord } from '../lib/game'
 import { getGooglePhoto } from '../lib/avatars'
 import { PlayerAvatar } from './PlayerAvatar'
 import { disablePhonePush } from '../lib/push'
@@ -97,8 +97,8 @@ function BetHistory({ userId }: { userId: string }) {
     {!loading && !error && !items.length && <p className="empty-history">No completed matches match this filter yet.</p>}
     <div className="bet-history-list">{items.map(item => <article className="bet-history-card" key={item.id}>
       <div><strong>{item.draw ? 'Draw' : item.won ? 'You won' : 'You lost'} against {item.opponent_name}</strong><span>{item.your_score} – {item.opponent_score}</span></div>
-      <small>{MODES[item.mode].name} · {item.variant === 'race' ? 'Live race' : 'Take turns'} · <time dateTime={item.completed_at}>{new Date(item.completed_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</time></small>
-      {item.draw ? <p>No bet won.</p> : <blockquote>{item.bet}</blockquote>}
+      <small>{item.mode === null ? GAME_NAMES[item.game_kind] : `${MODES[item.mode].name} · ${item.variant === 'race' ? 'Live race' : 'Take turns'}`} · <time dateTime={item.completed_at}>{new Date(item.completed_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</time></small>
+      {item.draw ? <p>No bet won.</p> : !item.bet || item.bet === NO_BET ? <p>No bet for this win.</p> : <blockquote>{item.bet}</blockquote>}
     </article>)}</div>
     {hasMore && <button className="button secondary full" disabled={loading} onClick={() => { void load(items.at(-1) ?? null) }}>Load older bets</button>}
   </section>

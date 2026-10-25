@@ -8,7 +8,9 @@ Alerts are generated when the opponent submits a guess that needs your clues, or
 
 Both browser and phone notifications use the title **Duo Dash** and the short message **Play your turn**. Memory Match also alerts the next player after a mismatch; finding a pair does not notify you about your own extra turn. Dots & Boxes alerts the incoming player when the previous player's rolled line budget is exhausted. Rolling, placing individual lines and claiming boxes do not replay a turn alert. Completed games and shared lobbies do not generate alerts.
 
-Solo games, including Memory Match, Dots & Boxes and Ring Rush against the computer, do not register incoming-turn events or send notifications. Ring Rush is a simultaneous race and never sends turn alerts in multiplayer either. Memory and Dots computer turns advance on the open game's polling loop; Ring Rush catches up elapsed-time computer moves when polled or before a human action.
+Bingo alerts the next caller, Cheat alerts the opponent when a face-down play needs a decision, and Hangman alerts the next guesser after both words are locked. Accepting or challenging a Cheat play leaves the responder on their own play turn and must not generate another incoming-turn alert. Notification payloads never contain called numbers, card faces, claims, word categories, words or guessed letters. Migration nineteen adds these transitions to the existing private outbox.
+
+All solo games, including Bingo, Cheat and Hangman against the computer, do not register incoming-turn events or send notifications. Ring Rush is a simultaneous race and never sends turn alerts in multiplayer either. Turn-based computers advance on the open game's polling loop; Ring Rush catches up elapsed-time computer moves when polled or before a human action.
 
 **Phone notifications** are a separate, persistent device opt-in. They use encrypted Web Push, a service worker, and server-triggered delivery, so they do not depend on the game tab polling while another app is open. Delivery is best-effort: device Focus modes, disabled permissions, network connectivity and OS/browser restrictions can delay or suppress it.
 

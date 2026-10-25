@@ -19,15 +19,16 @@ test('shared Ring Rush starts identical mobile boards, synchronizes moves/restar
     await Promise.all(contexts.map(context => context.addInitScript(id => localStorage.setItem('crack-the-code.room', id), room)))
     const [a, b] = await Promise.all(contexts.map(context => context.newPage()))
     await Promise.all([a.goto('/'), b.goto('/')])
-    await a.getByRole('button', { name: /Ring Rush.*Same shuffled rings/ }).click()
-    await expect(b.getByRole('button', { name: /Ring Rush.*Same shuffled rings/ })).toHaveAttribute('aria-pressed', 'true')
+    await a.getByRole('button', { name: /Ring Rush.*Same shuffled beads/ }).click()
+    await expect(b.getByRole('button', { name: /Ring Rush.*Same shuffled beads/ })).toHaveAttribute('aria-pressed', 'true')
     await a.getByRole('button', { name: 'Confirm & play together' }).click()
     await expect(b.locator('.duo-consent')).toContainText('Alice: ready')
     await b.getByRole('button', { name: 'Confirm & play together' }).click()
     await expect(a.getByRole('heading', { name: /^Get ready:/ })).toBeVisible()
-    await expect(a.locator('.ring-piece')).toHaveCount(20)
+    await expect(a.locator('.ring-progress .turn-character.active')).toHaveCount(2)
+    await expect(a.locator('.ring-piece')).toHaveCount(40)
     await expect(a.locator('.ring-rod')).toHaveCount(5)
-    await expect(a.getByRole('button', { name: 'Restart my rings', exact: true })).toBeDisabled()
+    await expect(a.getByRole('button', { name: 'Restart my beads', exact: true })).toBeDisabled()
     const raw = (await db.query<{ board: { boards: Record<string, number[][]>; solution: number[] } }>('select board from private.ring_games where room_id=$1', [room])).rows[0].board
     expect(await a.locator('.ring-rod').evaluateAll(rods => rods.map(rod => rod.getAttribute('aria-description')))).toEqual(await b.locator('.ring-rod').evaluateAll(rods => rods.map(rod => rod.getAttribute('aria-description'))))
     const first = raw.solution[0]
@@ -39,14 +40,14 @@ test('shared Ring Rush starts identical mobile boards, synchronizes moves/restar
     await expect(target).toHaveClass(/can-receive/)
     await target.click()
     await expect(b.locator('.ring-progress > div').first()).toContainText('1 moves')
-    await a.getByRole('button', { name: 'Restart my rings', exact: true }).click()
+    await a.getByRole('button', { name: 'Restart my beads', exact: true }).click()
     await expect(a.locator('.ring-race-stats')).toContainText('1 moves · 1 restarts')
     await b.locator('.ring-rod').nth(Math.floor(first / 5)).click()
     await b.locator('.ring-rod').nth(first % 5).click()
     await expect(a.locator('.ring-progress > div').nth(1)).toContainText('1 moves')
     await a.reload()
     await expect(a.locator('.ring-race-stats')).toContainText('1 moves · 1 restarts')
-    await expect(a.locator('.ring-piece')).toHaveCount(20)
+    await expect(a.locator('.ring-piece')).toHaveCount(40)
     let rods = raw.boards[alice]
     for (const code of raw.solution.slice(0, -1)) rods = apply(rods, code)
     const count = raw.solution.length + 1
@@ -87,7 +88,7 @@ test('solo Ring Rush supports difficulty, real computer progress, late-return lo
       await expect(page.getByRole('button', { name: `${difficulty} computer`, exact: true })).toHaveAttribute('aria-pressed', 'true')
     }
     await page.getByRole('button', { name: 'Play against computer', exact: true }).click()
-    await expect(page.locator('.ring-piece')).toHaveCount(20)
+    await expect(page.locator('.ring-piece')).toHaveCount(40)
     const saved = (await db.query<{ id: string; board: { boards: Record<string, number[][]>; solution: number[] } }>('select id,board from private.solo_boards where user_id=$1', [player])).rows[0]
     const first = saved.board.solution[0]
     await expect(page.locator('.ring-rod').nth(Math.floor(first / 5))).toBeEnabled()

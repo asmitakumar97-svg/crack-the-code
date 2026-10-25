@@ -21,6 +21,7 @@ test('two players see the same D8 roll, each placed line, turn limits, reload an
     await expect(b.locator('.duo-consent')).toContainText('Alice: ready')
     await b.getByRole('button', { name: 'Confirm & play together' }).click()
     await expect(a.getByRole('heading', { name: 'Your turn to roll.' })).toBeVisible()
+    await expect(a.locator('.dots-scores .turn-character.active')).toHaveClass(/turn-mint/)
     await expect(b.getByRole('button', { name: 'Roll D8', exact: true })).toBeDisabled()
     await expect(a.locator('.dots-edge')).toHaveCount(420)
     await expect(a.locator('.dots-dot')).toHaveCount(225)
@@ -40,6 +41,7 @@ test('two players see the same D8 roll, each placed line, turn limits, reload an
       await a.getByRole('button', { name: `Horizontal line row 1 column ${edge + 1}`, exact: true }).click()
     }
     await expect(b.getByRole('heading', { name: 'Your turn to roll.' })).toBeVisible()
+    await expect(b.locator('.dots-scores .turn-character.active')).toHaveClass(/turn-amber/)
     await expect(a.getByRole('button', { name: 'Roll D8', exact: true })).toBeDisabled()
     await b.reload()
     await expect(b.getByRole('heading', { name: 'Your turn to roll.' })).toBeVisible()

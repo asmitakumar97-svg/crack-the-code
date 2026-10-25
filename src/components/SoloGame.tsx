@@ -5,6 +5,7 @@ import { formatTime, MODES, type Mode, type SoloChallenge, type SoloState } from
 import { CodeEntry } from './CodeEntry'
 import { HistoryPanel } from './HistoryPanel'
 import { Legend, Tiles } from './Tiles'
+import { TurnAvatar } from './TurnAvatar'
 
 export function SoloGame({ userId, mode, challenge, onModeChange, onChallengeChange, onHelp, onHome }: {
   userId: string; mode: Mode; challenge: SoloChallenge
@@ -127,6 +128,7 @@ export function SoloGame({ userId, mode, challenge, onModeChange, onChallengeCha
         <div className="solo-reveal"><span>The secret {game.mode === 'word' ? 'word' : 'code'}</span><Tiles mode={game.mode} value={game.secret ?? ''} length={game.secret?.length ?? MODES[game.mode].length} animated /></div>
         <button className="button primary full" disabled={busy} onClick={() => { void start() }}><RotateCcw size={16} />{busy ? 'Starting…' : 'Play again'}</button><button className="text-button" disabled={busy} onClick={setup}>Change solo challenge</button>
       </div>}
+      <div className="solo-player-turn"><TurnAvatar player={{ user_id: userId, name: 'You' }} host activity={{ active: game.status === 'playing' && !expired, label: game.status === 'playing' && !expired ? 'Your turn to guess' : 'Puzzle complete' }} /></div>
       <div className={`arena-layout arena-${game.mode} solo-arena`}>
         {game.status === 'playing' && <div className="panel input-panel"><div className="arena-heading"><h1>Crack this {game.mode === 'word' ? 'word' : 'code'}.</h1>{remaining !== null ? <span className="elapsed solo-timer" aria-label="Time remaining"><Clock3 size={15} />{formatTime(remaining)}</span> : <span className="turn-badge">6 guesses</span>}</div>
           <p className="solo-private-note">The answer stays hidden until you finish.</p>

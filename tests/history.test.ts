@@ -60,7 +60,7 @@ describe('private, immutable bet history', () => {
       await tx.query('select public.get_bet_history()')
     })).rejects.toThrow('permission denied')
     const records = await history(pair.a)
-    expect(Object.keys(records[0]).sort()).toEqual(['bet', 'completed_at', 'draw', 'id', 'mode', 'opponent_id', 'opponent_name', 'opponent_score', 'variant', 'won', 'your_score'].sort())
+    expect(Object.keys(records[0]).sort()).toEqual(['bet', 'completed_at', 'draw', 'game_kind', 'id', 'mode', 'opponent_id', 'opponent_name', 'opponent_score', 'variant', 'won', 'your_score'].sort())
   })
 
   it('paginates every record without losing same-time matches and validates filters and cursors', async () => {

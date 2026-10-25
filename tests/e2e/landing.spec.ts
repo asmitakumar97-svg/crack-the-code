@@ -28,9 +28,19 @@ test('welcome page names the game and offers accessible play choices across size
         await page.getByRole('button', { name: `Use ${theme} theme`, exact: true }).click()
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
         expect(await page.locator('#landing-title').evaluate(element => parseFloat(getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(48)
-        const caption = await page.locator('.landing-caption').boundingBox()
-        const sticker = await page.locator('.landing-sticker').boundingBox()
-        expect(sticker!.y).toBeGreaterThanOrEqual(caption!.y + caption!.height)
+        const cards = page.locator('.landing-game-card')
+        await expect(cards).toHaveCount(7)
+        const sizes = await cards.evaluateAll(elements => elements.map(element => {
+          const box = element.getBoundingClientRect()
+          return { width: box.width, height: box.height, overflow: element.scrollWidth > element.clientWidth }
+        }))
+        for (const size of sizes) {
+          expect(Math.abs(size.width - sizes[0].width)).toBeLessThanOrEqual(1)
+          expect(Math.abs(size.height - sizes[0].height)).toBeLessThanOrEqual(1)
+          expect(size.overflow).toBe(false)
+        }
+        await expect(page.locator('.landing-game-preview')).toHaveCount(7)
+        await expect(page.locator('.landing-ring-preview .landing-mini-ring')).toHaveCount(40)
         for (const name of ['Play with a friend', 'Play solo']) {
           const button = page.getByRole('button', { name, exact: true })
           await expect(button).toBeVisible()
@@ -53,9 +63,31 @@ test('welcome page names the game and offers accessible play choices across size
         }
       }
     }
+    await page.setViewportSize({ width: 1280, height: 900 })
+    await page.screenshot({ path: test.info().outputPath('matching-game-cards-desktop.png'), fullPage: true })
+    await page.setViewportSize({ width: 375, height: 844 })
+    await page.screenshot({ path: test.info().outputPath('matching-game-cards-mobile.png'), fullPage: true })
     await page.getByRole('button', { name: 'Learn the rules', exact: true }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
     await page.getByRole('button', { name: 'Close dialog', exact: true }).click()
+  } finally { await context.close(); await db.close() }
+})
+
+test('each matching game card opens shared-room setup and remains keyboard accessible', async ({ browser }) => {
+  const db = await createDatabase()
+  const context = await browser.newContext()
+  try {
+    await connect(context, db)
+    const page = await context.newPage()
+    await page.goto('/')
+    for (const name of ['Crack the Code', 'Memory Match', 'Dots & Boxes', 'Ring Rush', 'Bingo', 'Cheat', 'Hangman']) {
+      const card = page.getByRole('button', { name: `Explore ${name}`, exact: true })
+      await card.focus()
+      await page.keyboard.press('Enter')
+      await expect(page.getByRole('button', { name: 'Create Duo room', exact: true })).toBeVisible()
+      await page.getByRole('button', { name: 'Back to home', exact: true }).click()
+      await expect(card).toBeVisible()
+    }
   } finally { await context.close(); await db.close() }
 })
 

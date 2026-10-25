@@ -75,6 +75,7 @@ async function launchRound(a: Page, b: Page, aCode: string, bCode: string, turns
   await a.getByRole('button', { name: /^Start (game|round)$/ }).click()
   await expect(a.getByText('You both start together.')).toBeVisible()
   await expect(a.getByLabel('Your guess', { exact: true })).toBeVisible()
+  await expect(a.locator('.scoreboard .turn-character.active')).toHaveCount(turns ? 1 : 2)
   if (!turns) await expect(b.getByLabel('Your guess', { exact: true })).toBeVisible()
 }
 
@@ -310,6 +311,8 @@ for (const [mode, ownSecret, rivalSecret, firstGuess, secondGuess] of [
     await expect(b.getByLabel('Your guess', { exact: true })).toHaveCount(0)
     await guess(a, firstGuess)
     await expect(b.getByLabel('Mark clues')).toBeVisible()
+    await expect(b.locator('.scoreboard .turn-character.active')).toHaveClass(/turn-amber/)
+    await expect(b.locator('.scoreboard .turn-character.active')).toContainText('Give your clues')
     await b.reload()
     await expect(b.getByLabel('Mark clues')).toBeVisible()
     await b.getByRole('button', { name: 'Check & send hints' }).click()

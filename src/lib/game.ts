@@ -4,7 +4,21 @@ export type Mark = 'hit' | 'present' | 'miss'
 export type Stake = 'low' | 'high'
 export type Phase = 'lobby' | 'setting' | 'playing' | 'round_over' | 'match_over'
 export type SoloChallenge = 'attempts' | 'timed'
-export type SoloKind = 'code' | 'memory' | 'dots' | 'ring'
+export type PartyKind = 'bingo' | 'cheat' | 'hangman'
+export type SoloKind = 'code' | 'memory' | 'dots' | 'ring' | PartyKind
+export const NO_BET = 'Just for fun - no bet.'
+export const GAME_NAMES: Record<SoloKind, string> = {
+  code: 'Crack the Code', memory: 'Memory Match', dots: 'Dots & Boxes', ring: 'Ring Rush',
+  bingo: 'Bingo', cheat: 'Cheat', hangman: 'Hangman',
+}
+export const PARTY_GAMES = [
+  { id: 'bingo', name: 'Bingo', detail: '25 numbers · five lines to win', rules: 'Different shuffled 5×5 boards. Take turns calling an uncalled number from 1 to 25; each call marks both boards. Complete five rows, columns or diagonals first. If both reach five on the same call, it is a draw.', solo: 'Easy calls randomly. Medium builds promising lines. Hard gives more weight to nearly completed lines. The computer uses only its own board and the public called numbers.' },
+  { id: 'cheat', name: 'Cheat', detail: 'Hidden cards · call the bluff', rules: 'A 52-card deck, 26 cards each. Claims cycle Ace through King. Play 1–4 cards face down as the required rank; your opponent accepts or calls your bluff. A caught liar takes the pile; a wrong caller takes it. The responder leads the next rank. Empty your hand and survive the final challenge to win.', solo: 'The computer plays from its own hand and never inspects yours or face-down plays. Hard calls bluffs more often; all levels call claims made impossible by the cards in their own hand.' },
+  { id: 'hangman', name: 'Hangman', detail: 'Secret words · alternating guesses', rules: 'Both players privately lock a 3–12-letter word and category, or request a random word. Then alternate guessing one letter in each other’s word, even after correct guesses. First to solve wins; six wrong letters loses. Pick a new theme or custom word in the next game.', solo: 'Easy guesses random letters and sets shorter words. Medium uses common-letter frequency. Hard considers the category and revealed pattern, never your secret word. Both players still alternate guesses.' },
+] as const
+export function isPartyKind(kind: string | undefined): kind is PartyKind {
+  return kind === 'bingo' || kind === 'cheat' || kind === 'hangman'
+}
 export type Difficulty = 'easy' | 'medium' | 'hard'
 export interface BoardController {
   userId: string
@@ -13,7 +27,7 @@ export interface BoardController {
 }
 export interface BoardGame {
   room: { host_id: string }
-  players: { user_id: string; name: string }[]
+  players: { user_id: string; name: string; avatar_url?: string | null }[]
 }
 export interface BoardOptions {
   tiles: 12 | 16 | 24
@@ -29,7 +43,47 @@ export type SoloBoardState = {
   next_action_at: string | null
   computer_id: string
   move_accepted?: boolean
-} & ({ kind: 'memory'; board: MemoryState } | { kind: 'dots'; board: DotsState } | { kind: 'ring'; board: RingState })
+} & ({ kind: 'memory'; board: MemoryState } | { kind: 'dots'; board: DotsState } | { kind: 'ring'; board: RingState } |
+  { kind: 'bingo'; board: BingoState } | { kind: 'cheat'; board: CheatState } | { kind: 'hangman'; board: HangmanState })
+interface PartyBase {
+  session_id: string
+  moves: number
+  turn_number: number
+  turn_user: string | null
+  finished: boolean
+  winner_id: string | null
+  finished_at: string | null
+  a: string
+  b: string
+}
+export interface BingoState extends PartyBase {
+  kind: 'bingo'
+  numbers: number[]
+  called: number[]
+  lines: Record<string, number>
+}
+export interface CheatState extends PartyBase {
+  kind: 'cheat'
+  cards: number[]
+  hand_counts: Record<string, number>
+  pile_count: number
+  rank: number
+  phase: 'play' | 'challenge'
+  last_play: { player: string; count: number; rank: number } | null
+  reveal: { cards: number[]; truthful: boolean; recipient: string } | null
+}
+export interface HangmanState extends PartyBase {
+  kind: 'hangman'
+  phase: 'setting' | 'guessing'
+  ready: string[]
+  own_word: string | null
+  categories: Record<string, string>
+  patterns: Record<string, string>
+  misses: Record<string, number>
+  guesses: Record<string, string[]>
+  reveals?: Record<string, string>
+}
+export type PartyState = BingoState | CheatState | HangmanState
 export interface RingState {
   session_id: string
   boards: Record<string, number[][]>
@@ -76,7 +130,7 @@ export interface Room {
   variant: Variant
   turn_user_id: string | null
   started_at: string | null
-  game_kind?: 'code' | 'memory' | 'dots' | 'ring'
+  game_kind?: SoloKind
   duo_lobby?: boolean
 }
 export interface Guess {
@@ -106,16 +160,19 @@ export interface GameState {
   memory?: MemoryState
   dots?: DotsState
   ring?: RingState
+  party?: PartyState
+  duo_bet?: { session_id: string; wagers: Record<string, string> }
 }
 export interface HubState {
   revision: number
-  selected: 'code' | 'memory' | 'dots' | 'ring'
+  selected: SoloKind
   tiles: 12 | 16 | 24
   theme: MemoryTheme
   mode: Mode
   variant: Variant
   ready: string[]
   dots?: 10 | 12 | 15
+  wagers?: Record<string, string>
 }
 export interface DotsState {
   session_id: string
@@ -145,12 +202,11 @@ export interface MemoryState {
   theme: MemoryTheme
   cards: (number | null)[]
   matched: number[]
+  owners?: Record<string, string>
 }
-export interface BetRecord {
+interface BetRecordBase {
   id: string
   completed_at: string
-  mode: Mode
-  variant: Variant
   opponent_id: string
   opponent_name: string
   won: boolean
@@ -159,6 +215,10 @@ export interface BetRecord {
   your_score: number
   opponent_score: number
 }
+export type BetRecord = BetRecordBase & (
+  { game_kind?: 'code'; mode: Mode; variant: Variant } |
+  { game_kind: Exclude<SoloKind, 'code'>; mode: null; variant: null }
+)
 export interface SoloState {
   id: string
   mode: Mode

@@ -10,6 +10,13 @@ export function getTurnAlert(game: GameState, userId: string, started: boolean):
   const { room, pending_guess: pending } = game
   if (room.duo_lobby) return null
   if (room.game_kind === 'ring') return null
+  if (game.party) {
+    const party = game.party
+    return !party.finished && party.turn_user === userId ? {
+      key: `${room.id}.${party.kind}.${party.session_id}.${party.turn_number}`,
+      kind: 'guess', message: 'Play your turn',
+    } : null
+  }
   if (room.game_kind === 'dots') {
     const dots = game.dots
     return dots && !dots.finished && dots.turn_user === userId ? {

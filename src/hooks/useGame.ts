@@ -22,7 +22,7 @@ export function useGame() {
   const pending = useRef(false)
   const currentRoom = useRef(roomId)
   currentRoom.current = roomId
-  const fastBoardSync = Boolean(game?.room.duo_lobby || game?.room.game_kind === 'dots' || game?.room.game_kind === 'ring')
+  const fastBoardSync = Boolean(game?.room.duo_lobby || game?.room.game_kind && game.room.game_kind !== 'code' && game.room.game_kind !== 'memory')
 
   const refresh = useCallback(async (id: string) => {
     const state = await getState(id)

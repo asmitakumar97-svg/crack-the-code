@@ -9,6 +9,7 @@ async function start(page: Page, mode: string, timed = false) {
   if (timed) await page.getByRole('button', { name: /^3-minute timer/ }).click()
   await page.getByRole('button', { name: 'Start solo puzzle', exact: true }).click()
   await expect(page.getByLabel('Your guess', { exact: true })).toBeVisible()
+  await expect(page.locator('.solo-player-turn .turn-character.active')).toHaveCount(1)
 }
 async function guess(page: Page, value: string) {
   await page.getByLabel('Your guess', { exact: true }).fill(value)

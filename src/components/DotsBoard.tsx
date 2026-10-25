@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Dices, Minus, Plus, Trophy } from 'lucide-react'
 import type { BoardController, BoardGame, DotsState } from '../lib/game'
+import { getBoardActivity } from '../lib/playerTurns'
+import { TurnAvatar } from './TurnAvatar'
 
 export function DotsBoard({ controller, game, dots, disabled }: { controller: BoardController; game: BoardGame; dots: DotsState; disabled: boolean }) {
   const [now, setNow] = useState(Date.now())
@@ -29,6 +31,7 @@ export function DotsBoard({ controller, game, dots, disabled }: { controller: Bo
     <span className="eyebrow">DOTS &amp; BOXES · {dots.dots} × {dots.dots} DOTS · D8 EDITION</span>
     <h1 aria-live="polite">{dots.finished ? winners.length === 2 ? 'A brilliant tie.' : winners[0].name === 'You' ? 'You win!' : `${winners[0].name} wins!` : rolling ? roller?.name === 'You' ? 'You are rolling…' : `${roller?.name} is rolling…` : yourTurn ? dots.remaining ? 'Make your lines count.' : 'Your turn to roll.' : `${turnPlayer.name}’s turn.`}</h1>
     <div className="memory-scores dots-scores">{game.players.map(player => <span key={player.user_id} className={`${colour(player.user_id)} ${player.user_id === dots.turn_user && !dots.finished ? 'active' : ''}`}>
+      <TurnAvatar player={player} host={player.user_id === game.room.host_id} activity={getBoardActivity(dots, player.user_id, serverNow)} />
       {dots.finished && winners.includes(player) && <Trophy size={16} />}<span className="dots-player-key" aria-hidden="true">{player.user_id === game.room.host_id ? 'A' : 'B'}</span>{player.name}<strong>{dots.scores[player.user_id]} boxes</strong>
     </span>)}</div>
     <div className="dots-roll-panel">
