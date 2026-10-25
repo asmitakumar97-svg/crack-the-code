@@ -19,8 +19,9 @@ test('welcome page names the game and offers accessible play choices across size
     await page.goto('/')
     await expect(page.getByRole('heading', { name: 'Crack the Code', exact: true })).toBeVisible()
     await expect(page.getByLabel('Your name', { exact: true })).toHaveCount(0)
-    await expect(page.locator('.landing-demo .tile')).toHaveCount(12)
-    await expect(page.locator('.landing-code-row').last().locator('.tile')).toHaveClass(Array(4).fill('tile hit filled'))
+    await expect(page.getByText('6-digit codes', { exact: true })).toBeVisible()
+    await expect(page.locator('.landing-demo .tile')).toHaveCount(18)
+    await expect(page.locator('.landing-code-row').last().locator('.tile')).toHaveClass(Array(6).fill('tile hit filled'))
     for (const width of [320, 375, 768, 1280]) {
       await page.setViewportSize({ width, height: 844 })
       for (const theme of ['pastel', 'dark']) {

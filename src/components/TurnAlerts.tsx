@@ -64,7 +64,7 @@ export function TurnAlerts({ game, userId, started }: { game: GameState; userId:
     void sound()
     if (!phonePush && (document.visibilityState === 'hidden' || !document.hasFocus()) && 'Notification' in window && Notification.permission === 'granted') {
       try {
-        const alert = new Notification('Crack the Code — your move', {
+        const alert = new Notification('Crack the Code', {
           body: current.message, tag: `crack-the-code.${game.room.id}`,
           icon: new URL(`${import.meta.env.BASE_URL}favicon.svg?v=lock-tiles`, location.origin).href,
           silent: true,

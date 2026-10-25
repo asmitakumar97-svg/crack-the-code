@@ -17,7 +17,7 @@ const submit = (player: string, game: SoloState, guess: string | null, attempt: 
 
 describe('protected, server-validated solo puzzles', () => {
   it.each([
-    ['number', '0011', '0000', ['hit', 'hit', 'miss', 'miss']],
+    ['number', '001156', '000000', ['hit', 'hit', 'miss', 'miss', 'miss', 'miss']],
     ['word', 'SECRET', 'STREET', ['hit', 'miss', 'present', 'present', 'hit', 'hit']],
   ] as const)('hides the %s answer, checks duplicate clues and reveals only after completion', async (mode, answer, guess, marks) => {
     const { player, game } = await puzzle(mode)
@@ -38,15 +38,15 @@ describe('protected, server-validated solo puzzles', () => {
 
   it('allows exactly six accepted guesses and does not accept a seventh after losing', async () => {
     const { player, game } = await puzzle()
-    await db.query("update private.solo_games set answer='9999' where id=$1", [game.id])
+    await db.query("update private.solo_games set answer='999999' where id=$1", [game.id])
     for (let attempt = 1; attempt <= 6; attempt++) {
-      const result = await submit(player, game, '0000', attempt)
+      const result = await submit(player, game, '000000', attempt)
       expect(result.accepted).toBe(true)
       expect(result.game.status).toBe(attempt === 6 ? 'lost' : 'playing')
       expect(result.game.guesses).toHaveLength(attempt)
-      expect(result.game.secret).toBe(attempt === 6 ? '9999' : null)
+      expect(result.game.secret).toBe(attempt === 6 ? '999999' : null)
     }
-    const seventh = await submit(player, game, '9999', 7)
+    const seventh = await submit(player, game, '999999', 7)
     expect(seventh.accepted).toBe(false)
     expect(seventh.game.status).toBe('lost')
     expect(seventh.game.guesses).toHaveLength(6)
@@ -56,14 +56,14 @@ describe('protected, server-validated solo puzzles', () => {
     const { player, game } = await puzzle('number', 'timed')
     expect(game.max_guesses).toBeNull()
     expect(Date.parse(game.deadline!) - Date.parse(game.started_at)).toBe(180000)
-    await db.query("update private.solo_games set answer='9999' where id=$1", [game.id])
+    await db.query("update private.solo_games set answer='999999' where id=$1", [game.id])
     for (let attempt = 1; attempt <= 12; attempt++) {
-      const result = await submit(player, game, '0000', attempt)
+      const result = await submit(player, game, '000000', attempt)
       expect(result).toMatchObject({ accepted: true, game: { status: 'playing', deadline: game.deadline, secret: null } })
     }
     await db.query("update private.solo_games set started_at=clock_timestamp()-interval '181 seconds',deadline=clock_timestamp()-interval '1 second' where id=$1", [game.id])
-    const late = await submit(player, game, '9999', 13)
-    expect(late).toMatchObject({ accepted: false, reason: 'time_expired', game: { status: 'lost', secret: '9999' } })
+    const late = await submit(player, game, '999999', 13)
+    expect(late).toMatchObject({ accepted: false, reason: 'time_expired', game: { status: 'lost', secret: '999999' } })
     expect(late.game.guesses).toHaveLength(12)
     expect(late.game.finished_at).toBe(late.game.deadline)
   })
@@ -98,10 +98,10 @@ describe('protected, server-validated solo puzzles', () => {
     const { player, game } = await puzzle()
     const outsider = await user(db)
     await expect(call(db, outsider, 'get_solo_game', [game.id])).rejects.toThrow('No solo puzzle was found')
-    await expect(submit(outsider, game, '0000', 1)).rejects.toThrow('No solo puzzle was found')
+    await expect(submit(outsider, game, '000000', 1)).rejects.toThrow('No solo puzzle was found')
     expect(await call(db, outsider, 'get_solo_game', [null])).toBeNull()
     await expect(asUser(db, player, 'select * from private.solo_games')).rejects.toThrow('permission denied')
-    await expect(asUser(db, player, "update private.solo_games set answer='0000' where id=$1", [game.id])).rejects.toThrow('permission denied')
+    await expect(asUser(db, player, "update private.solo_games set answer='000000' where id=$1", [game.id])).rejects.toThrow('permission denied')
     await expect(db.transaction(async tx => {
       await tx.exec('set local role anon')
       await tx.query("select public.create_solo_game('number','attempts')")

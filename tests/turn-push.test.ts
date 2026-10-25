@@ -35,8 +35,8 @@ async function activePair(mode: 'number' | 'word' = 'number', variant: 'turns' |
   const pair = await roomPair(db, mode, variant)
   await subscription(pair.a)
   await subscription(pair.b)
-  await call(db, pair.a, 'set_secret', [pair.room, mode === 'number' ? '1122' : 'LETTER'])
-  await call(db, pair.b, 'set_secret', [pair.room, mode === 'number' ? '3344' : 'SECRET'])
+  await call(db, pair.a, 'set_secret', [pair.room, mode === 'number' ? '112256' : 'LETTER'])
+  await call(db, pair.b, 'set_secret', [pair.room, mode === 'number' ? '334456' : 'SECRET'])
   await launch(db, pair)
   return pair
 }
@@ -47,7 +47,7 @@ async function claim(id: string) {
 async function latest(room: string) {
   return (await db.query<{ id: string }>('select id from private.turn_push_events where room_id=$1 order by created_at desc,id desc limit 1', [room])).rows[0].id
 }
-async function guess(pair: { a: string; room: string }, value = '0000') {
+async function guess(pair: { a: string; room: string }, value = '000000') {
   await call(db, pair.a, 'submit_guess', [pair.room, value, 1])
   return state(db, pair.a, pair.room)
 }
@@ -95,15 +95,15 @@ describe('turn transitions and notification jobs', () => {
   it.each(['number', 'word'] as const)('queues %s clues once for the defender, never secret data or the same player’s follow-up guess', async mode => {
     const pair = await activePair(mode)
     const before = (await db.query<{ count: number }>('select count(*)::int as count from private.turn_push_events where room_id=$1', [pair.room])).rows[0].count
-    const pending = (await guess(pair, mode === 'number' ? '0000' : 'FRUITS')).pending_guess!
+    const pending = (await guess(pair, mode === 'number' ? '000000' : 'FRUITS')).pending_guess!
     const id = await latest(pair.room)
     const event = await claim(id)
     expect(event).toMatchObject({ eventId: id, roomId: pair.room, kind: 'clues' })
     expect(event!.subscriptions).toHaveLength(1)
-    expect(JSON.stringify(event)).not.toMatch(/FRUITS|0000|1122|3344|SECRET|LETTER/)
+    expect(JSON.stringify(event)).not.toMatch(/FRUITS|000000|112256|334456|SECRET|LETTER/)
     await db.query('update public.rooms set version=version+1 where id=$1', [pair.room])
     expect((await db.query<{ count: number }>('select count(*)::int as count from private.turn_push_events where room_id=$1', [pair.room])).rows[0].count).toBe(before + 1)
-    await call(db, pair.b, 'submit_hints', [pair.room, pending.id, getFeedback(mode === 'number' ? '3344' : 'SECRET', pending.guess)])
+    await call(db, pair.b, 'submit_hints', [pair.room, pending.id, getFeedback(mode === 'number' ? '334456' : 'SECRET', pending.guess)])
     expect((await db.query<{ count: number }>('select count(*)::int as count from private.turn_push_events where room_id=$1', [pair.room])).rows[0].count).toBe(before + 1)
   })
   it('skips stale jobs, does not queue races or solved rounds, and authorizes notification links', async () => {
@@ -118,7 +118,7 @@ describe('turn transitions and notification jobs', () => {
     await guess(race)
     expect((await db.query('select * from private.turn_push_events where room_id=$1', [race.room])).rows).toHaveLength(0)
     const solved = await activePair()
-    await guess(solved, '3344')
+    await guess(solved, '334456')
     expect((await db.query('select * from private.turn_push_events where room_id=$1 and kind=$2', [solved.room, 'clues'])).rows).toHaveLength(0)
     await expect(state(db, await user(db), pair.room)).rejects.toThrow(/not a member/)
   })
@@ -164,7 +164,7 @@ describe('turn transitions and notification jobs', () => {
     expect(getTurnAlert(pending, pair.a, true)).toBeNull()
     expect(shouldAnnounceTurn(null, action)).toBe(true)
     expect(shouldAnnounceTurn(action, action)).toBe(false)
-    await call(db, pair.b, 'submit_hints', [pair.room, pending.pending_guess!.id, Array(4).fill('miss')])
+    await call(db, pair.b, 'submit_hints', [pair.room, pending.pending_guess!.id, Array(6).fill('miss')])
     const next = getTurnAlert(await state(db, pair.b, pair.room), pair.b, true)
     expect(next?.kind).toBe('guess')
     expect(shouldAnnounceTurn(action, next)).toBe(false)

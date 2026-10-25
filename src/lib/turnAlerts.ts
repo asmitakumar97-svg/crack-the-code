@@ -15,12 +15,12 @@ export function getTurnAlert(game: GameState, userId: string, started: boolean):
   if (pending) {
     return pending.user_id === userId ? null : {
       key: `${prefix}.clues.${pending.id}`, kind: 'clues',
-      message: 'Your opponent has guessed. It’s your turn to mark the clues.',
+      message: 'Play your turn',
     }
   }
   return room.turn_user_id === userId ? {
     key: `${prefix}.guess.${game.players.map(player => `${player.user_id}:${player.attempts}`).sort().join('.')}`,
-    kind: 'guess', message: 'It’s your turn to guess. Your opponent is waiting.',
+    kind: 'guess', message: 'Play your turn',
   } : null
 }
 

@@ -30,12 +30,12 @@ function worker() {
 }
 const roomId = '12345678-1234-1234-1234-123456789abc'
 describe('phone notification service worker', () => {
-  it('shows a private, generic turn message and opens the correct base-path room', async () => {
+  it.each(['clues', 'guess'])('shows a minimal %s message and opens the correct base-path room', async kind => {
     const sw = worker()
-    await sw.emit('push', { data: { json: () => ({ kind: 'clues', roomCode: 'ABC123', roomId, guess: 'DO NOT SHOW' }) } })
+    await sw.emit('push', { data: { json: () => ({ kind, roomCode: 'ABC123', roomId, guess: 'DO NOT SHOW' }) } })
     const [title, options] = sw.showNotification.mock.calls[0]
-    expect(title).toContain('your move')
-    expect(options.body).toContain('mark the clues')
+    expect(title).toBe('Crack the Code')
+    expect(options.body).toBe('Play your turn')
     expect(JSON.stringify(options)).not.toContain('DO NOT SHOW')
     expect(options.icon).toBe('https://example.test/crack-the-code/icon-192.png')
     expect(options.data.url).toBe(`https://example.test/crack-the-code/?room=ABC123&notificationRoom=${roomId}`)

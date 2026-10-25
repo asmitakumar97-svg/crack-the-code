@@ -52,7 +52,7 @@ for (const mode of ['Number Lock', 'Word Lock']) test(`real local ${mode} create
     const secrets: string[] = []
     for (const page of [a, b]) {
       const input = page.getByLabel(/^Your secret (code|word)$/)
-      const typed = mode === 'Word Lock' ? 'SECRET' : '0011'
+      const typed = mode === 'Word Lock' ? 'SECRET' : '001156'
       await input.fill(typed)
       await expect(input).toHaveAttribute('type', 'text')
       await expect(page.locator('.code-entry .tile')).toHaveText([...typed])
@@ -60,7 +60,7 @@ for (const mode of ['Number Lock', 'Word Lock']) test(`real local ${mode} create
       await page.getByRole('button', { name: 'Choose for me' }).click()
       secrets.push(await input.inputValue())
       await expect(page.locator('.code-entry .tile')).toHaveText([...secrets.at(-1)!])
-      expect(secrets.at(-1)).toMatch(mode === 'Word Lock' ? /^[A-Z]{6}$/ : /^\d{4}$/)
+      expect(secrets.at(-1)).toMatch(mode === 'Word Lock' ? /^[A-Z]{6}$/ : /^\d{6}$/)
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
       await page.getByRole('button', { name: 'Lock my secret' }).click()
       await expect(page.getByLabel('Match bets', { exact: true })).toBeVisible()
@@ -136,7 +136,7 @@ test('real local completed bets remain private and visible after rematch in eith
     await roomPair(a, b)
     for (let round = 1; round <= 2; round++) {
       for (const [index, page] of [a, b].entries()) {
-        await page.getByLabel('Your secret code', { exact: true }).fill(index === 0 ? '1112' : '3344')
+        await page.getByLabel('Your secret code', { exact: true }).fill(index === 0 ? '111256' : '334456')
         await page.getByRole('button', { name: 'Lock my secret', exact: true }).click()
       }
       if (round === 1) await start(a, b)
@@ -144,7 +144,7 @@ test('real local completed bets remain private and visible after rematch in eith
         await a.getByRole('button', { name: 'Start round', exact: true }).click()
         await expect(a.getByLabel('Your guess', { exact: true })).toBeVisible()
       }
-      await a.getByLabel('Your guess', { exact: true }).fill('3344')
+      await a.getByLabel('Your guess', { exact: true }).fill('334456')
       await a.getByRole('button', { name: 'Try code', exact: true }).click()
       if (round === 1) for (const page of [a, b]) await page.getByRole('button', { name: 'Ready for round 2', exact: true }).click()
     }

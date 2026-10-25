@@ -1,7 +1,7 @@
 import { useId, useState } from 'react'
 import { ArrowRight, Delete, LockKeyhole, Shuffle } from 'lucide-react'
-import { MODES, displayItem, generateSecret, validateEntry, type Mark, type Mode, type Guess } from '../lib/game'
-import { CLUES, Tiles } from './Tiles'
+import { MODES, displayItem, generateSecret, getKeyboardMarks, validateEntry, type Mode, type Guess } from '../lib/game'
+import { Tiles } from './Tiles'
 
 export function CodeEntry({ mode, secret = false, words, busy, onSubmit, guesses = [] }: {
   mode: Mode; secret?: boolean; words: string[]; busy: boolean; onSubmit: (value: string) => Promise<boolean>; guesses?: Guess[]
@@ -28,12 +28,8 @@ export function CodeEntry({ mode, secret = false, words, busy, onSubmit, guesses
       setError(err instanceof Error ? err.message : 'Could not choose a secret. Please enter one using the keyboard.')
     }
   }
-  const keyMarks: Record<string, Mark> = {}
-  const priority = { miss: 1, present: 2, hit: 3 }
-  for (const guess of guesses) [...guess.guess].forEach((char, i) => {
-    const mark = guess.feedback[i]
-    if (!keyMarks[char] || priority[mark] > priority[keyMarks[char]]) keyMarks[char] = mark
-  })
+  const keyMarks = getKeyboardMarks(guesses)
+  const keyDescriptions = { miss: 'No match', present: 'Matching copies still need positions', hit: 'All known matching positions found' }
   const rows = mode === 'word' ? ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'] : ['12345', '67890']
 
   return <div className="code-entry">
@@ -59,7 +55,7 @@ export function CodeEntry({ mode, secret = false, words, busy, onSubmit, guesses
     <div className={`keyboard keyboard-${mode}`} aria-label="Virtual keyboard">
       {rows.map(row => <div className="key-row" key={row}>
         {[...row].map(key => <button key={key} type="button" disabled={busy} className={`key ${!secret ? keyMarks[key] ?? '' : ''}`}
-          aria-label={key} aria-description={!secret && keyMarks[key] ? CLUES[keyMarks[key]].label : undefined} onClick={() => add(key)}>{displayItem(mode, key)}</button>)}
+          aria-label={key} aria-description={!secret && keyMarks[key] ? keyDescriptions[keyMarks[key]] : undefined} onClick={() => add(key)}>{displayItem(mode, key)}</button>)}
       </div>)}
       <div className="keyboard-actions">
         <button className="key backspace" type="button" aria-label="Delete last character" disabled={busy || !value} onClick={() => setValue(old => old.slice(0, -1))}><Delete size={18} /> Delete</button>
@@ -68,5 +64,6 @@ export function CodeEntry({ mode, secret = false, words, busy, onSubmit, guesses
         </button>
       </div>
     </div>
+    {!secret && <p className="hint-check-note">Keyboard keys stay yellow until every matching copy shown by your clues has a green position. Guess tiles keep their usual colours.</p>}
   </div>
 }

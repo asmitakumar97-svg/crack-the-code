@@ -9,8 +9,8 @@ self.addEventListener('push', event => {
     const target = new URL(base)
     target.searchParams.set('room', data.roomCode)
     target.searchParams.set('notificationRoom', data.roomId)
-    await self.registration.showNotification('Crack the Code — your move', {
-      body: data.kind === 'clues' ? 'Your opponent has guessed. Open the game to mark the clues.' : 'It’s your turn to guess. Ready to crack the code?',
+    await self.registration.showNotification('Crack the Code', {
+      body: 'Play your turn',
       icon: new URL('icon-192.png', base).href,
       badge: new URL('icon-192.png', base).href,
       tag: `crack-the-code.${data.roomCode}`,

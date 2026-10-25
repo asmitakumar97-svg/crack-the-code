@@ -6,7 +6,7 @@ export type Phase = 'lobby' | 'setting' | 'playing' | 'round_over' | 'match_over
 export type SoloChallenge = 'attempts' | 'timed'
 
 export const MODES = {
-  number: { name: 'Number Lock', label: '01', length: 4, sample: ['3', '7', '1', '9'], detail: '4 digits', keys: '1234567890', description: 'Choose a secret four-digit code. Repeats and leading zeros are allowed.' },
+  number: { name: 'Number Lock', label: '01', length: 6, sample: ['3', '7', '1', '9', '0', '2'], detail: '6 digits', keys: '1234567890', description: 'Choose a secret six-digit code. Repeats and leading zeros are allowed.' },
   word: { name: 'Word Lock', label: '02', length: 6, sample: ['S', 'E', 'C', 'R', 'E', 'T'], detail: '6-letter words', keys: 'QWERTYUIOPASDFGHJKLZXCVBNM', description: 'Choose a six-letter word, or let us pick one.' },
 } satisfies Record<Mode, { name: string; label: string; length: number; sample: string[]; detail: string; keys: string; description: string }>
 
@@ -120,6 +120,30 @@ export function getFeedback(secret: string, guess: string): Mark[] {
     remaining.set(guess[i], copies - 1)
     return 'present'
   })
+}
+
+export function getKeyboardMarks(guesses: Guess[]): Record<string, Mark> {
+  const known = new Map<string, { copies: number; positions: Set<number> }>()
+  for (const guess of guesses) {
+    const matches = new Map<string, number>()
+    for (const [index, char] of [...guess.guess].entries()) {
+      let info = known.get(char)
+      if (!info) {
+        info = { copies: 0, positions: new Set<number>() }
+        known.set(char, info)
+      }
+      const mark = guess.feedback[index]
+      if (mark === 'hit') info.positions.add(index)
+      if (mark === 'hit' || mark === 'present') matches.set(char, (matches.get(char) ?? 0) + 1)
+    }
+    for (const [char, copies] of matches) {
+      const info = known.get(char)!
+      info.copies = Math.max(info.copies, copies)
+    }
+  }
+  return Object.fromEntries([...known].map(([char, info]) => [
+    char, info.copies === 0 ? 'miss' : info.positions.size >= info.copies ? 'hit' : 'present',
+  ]))
 }
 
 export function generateSecret(mode: Mode, words: string[]): string {

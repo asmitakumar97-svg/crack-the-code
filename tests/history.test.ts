@@ -14,7 +14,7 @@ const history = (id: string, search = '', result = 'won', before: BetRecord | nu
 async function finish(pair: Awaited<ReturnType<typeof roomPair>>) {
   for (let round = 1; round <= 2; round++) {
     await start(db, pair)
-    await call(db, pair.a, 'submit_guess', [pair.room, '3344', 1])
+    await call(db, pair.a, 'submit_guess', [pair.room, '334456', 1])
     if (round === 1) {
       await call(db, pair.a, 'advance_round', [pair.room])
       await call(db, pair.b, 'advance_round', [pair.room])

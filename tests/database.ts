@@ -46,7 +46,7 @@ export async function roomPair(db: PGlite, mode: Mode = 'number', variant: Varia
   await call(db, b, 'set_wager', [room, 'You bring me a snack.'])
   return { a, b, room, code }
 }
-export async function start(db: PGlite, pair: { a: string; b: string; room: string }, codes = ['1122', '3344']) {
+export async function start(db: PGlite, pair: { a: string; b: string; room: string }, codes = ['112256', '334456']) {
   await call(db, pair.a, 'set_secret', [pair.room, codes[0]])
   await call(db, pair.b, 'set_secret', [pair.room, codes[1]])
   await launch(db, pair)

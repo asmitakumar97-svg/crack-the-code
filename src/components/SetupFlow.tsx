@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, Clock3, Flame, Leaf, LockKeyhole, Repeat2, Users } from 'lucide-react'
 import type { useGame } from '../hooks/useGame'
-import { MODES, type Mark, type Mode, type Stake, type Variant } from '../lib/game'
+import { getFeedback, MODES, type Mode, type Stake, type Variant } from '../lib/game'
 import { configured } from '../lib/supabase'
 import { Legend, Tiles } from './Tiles'
 
@@ -52,7 +52,7 @@ export function SetupFlow({ controller, mode, setMode, variant, setVariant, onHo
         <button className={variant === 'turns' ? 'selected' : ''} aria-pressed={variant === 'turns'} onClick={() => setVariant('turns')}><Repeat2 size={17} /><strong>Take turns</strong><small>One guess each · keep alternating</small></button>
       </div>
       <ol className="how-to-play" aria-label={`${MODES[mode].name} instructions`}>
-        <li><span>1</span><p>{mode === 'word' ? 'Pick a secret six-letter word.' : 'Pick a secret four-digit code.'}<small>Then write your bets, agree and start.</small></p></li>
+        <li><span>1</span><p>{mode === 'word' ? 'Pick a secret six-letter word.' : 'Pick a secret six-digit code.'}<small>Then write your bets, agree and start.</small></p></li>
         <li><span>2</span><p>{variant === 'turns' ? 'Take one guess each. Tap matching clues; the game picks the colours.' : 'Guess together and follow the colours.'}<small>Green: right place. Yellow: wrong place. Grey: no match.</small></p></li>
         <li><span>3</span><p>First to crack the code wins.<small>Unlimited guesses. Best of three rounds.</small></p></li>
       </ol>
@@ -75,7 +75,7 @@ export function SetupFlow({ controller, mode, setMode, variant, setVariant, onHo
 }
 
 export function Illustration({ mode }: { mode: Mode }) {
-  const guess = mode === 'word' ? 'LETTER' : '2917'
-  const marks: Mark[] = mode === 'word' ? ['miss', 'hit', 'present', 'miss', 'hit', 'present'] : ['miss', 'present', 'hit', 'present']
+  const guess = mode === 'word' ? 'LETTER' : '291702'
+  const marks = getFeedback(MODES[mode].sample.join(''), guess)
   return <div className={`illustration illustration-${mode}`} aria-label={`${MODES[mode].name} example`}><div className="example-secret"><LockKeyhole size={13} /><span>{mode === 'word' ? 'SECRET WORD' : 'SECRET CODE'}</span></div><Tiles mode={mode} value={MODES[mode].sample.join('')} length={MODES[mode].length} /><span className="example-arrow">↓</span><Tiles mode={mode} value={guess} marks={marks} length={MODES[mode].length} animated /><Legend /></div>
 }
