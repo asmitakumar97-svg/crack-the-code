@@ -1,0 +1,53 @@
+import { expect, test } from '@playwright/test'
+
+test('real local Ring Rush shares race progress, restarts only your board and recovers after reload', async ({ browser }) => {
+  const contexts = await Promise.all([0, 1].map(() => browser.newContext({ viewport: { width: 375, height: 844 } })))
+  try {
+    const [a, b] = await Promise.all(contexts.map(context => context.newPage()))
+    await a.goto('/?play=duo')
+    await a.getByLabel('Your name', { exact: true }).fill('Alice')
+    await a.getByRole('button', { name: 'Create Duo room', exact: true }).click()
+    await expect(a.getByRole('heading', { name: 'What’s the mood?' })).toBeVisible()
+    const code = await a.locator('.game-nav strong').innerText()
+    await b.goto(`/?room=${code}&play=duo`)
+    await b.getByLabel('Your name', { exact: true }).fill('Bob')
+    await b.getByRole('button', { name: 'Join Duo room', exact: true }).click()
+    await a.getByRole('button', { name: /Ring Rush.*Same shuffled rings/ }).click()
+    await a.getByRole('button', { name: 'Confirm & play together', exact: true }).click()
+    await expect(b.locator('.duo-consent')).toContainText('Alice: ready')
+    await b.getByRole('button', { name: 'Confirm & play together', exact: true }).click()
+    await expect(a.locator('.ring-piece')).toHaveCount(20)
+    const source = a.getByRole('button', { name: /^Rod \d, 5 rings/ }).first()
+    await expect(source).toBeEnabled()
+    await source.click()
+    await a.getByRole('button', { name: /^Rod \d, 0 rings, empty$/ }).click()
+    await expect(b.locator('.ring-progress > div').first()).toContainText('1 moves')
+    await a.getByRole('button', { name: 'Restart my rings', exact: true }).click()
+    await expect(a.locator('.ring-race-stats')).toContainText('1 moves · 1 restarts')
+    await a.reload()
+    await expect(a.locator('.ring-piece')).toHaveCount(20)
+    await expect(a.locator('.ring-race-stats')).toContainText('1 moves · 1 restarts')
+    await expect(a.getByRole('alert')).toHaveCount(0)
+  } finally { await Promise.all(contexts.map(context => context.close())) }
+})
+
+test('real local solo Ring Rush moves legally and displays computer progress without a second player', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 320, height: 844 } })
+  try {
+    const page = await context.newPage()
+    await page.goto('/?play=solo&soloGame=ring')
+    await page.getByRole('button', { name: 'hard computer', exact: true }).click()
+    await page.getByRole('button', { name: 'Play against computer', exact: true }).click()
+    const source = page.getByRole('button', { name: /^Rod \d, 5 rings/ }).first()
+    await expect(source).toBeEnabled()
+    await source.click()
+    await page.getByRole('button', { name: /^Rod \d, 0 rings, empty$/ }).click()
+    await expect(page.locator('.ring-race-stats')).toContainText('1 moves')
+    await expect(page.locator('.ring-progress > div').nth(1)).not.toContainText('0 moves')
+    await page.reload()
+    await expect(page.locator('.ring-race-stats')).toContainText('1 moves')
+    await expect(page.locator('.ring-piece')).toHaveCount(20)
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  } finally { await context.close() }
+})

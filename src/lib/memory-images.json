@@ -1,0 +1,346 @@
+{
+  "paintings": [
+    {
+      "id": 147016,
+      "title": "Virgin and Child in a Landscape",
+      "source": "https://clevelandart.org/art/1972.47",
+      "license": "CC0",
+      "path": "memory/paintings/0.jpg"
+    },
+    {
+      "id": 152006,
+      "title": "Rocky, Wooded Landscape with a Dell and Weir",
+      "source": "https://clevelandart.org/art/1984.59",
+      "license": "CC0",
+      "path": "memory/paintings/1.jpg"
+    },
+    {
+      "id": 171296,
+      "title": "Vale of Kashmir",
+      "source": "https://clevelandart.org/art/2014.12",
+      "license": "CC0",
+      "path": "memory/paintings/2.jpg"
+    },
+    {
+      "id": 151298,
+      "title": "Prater Landscape",
+      "source": "https://clevelandart.org/art/1983.155",
+      "license": "CC0",
+      "path": "memory/paintings/3.jpg"
+    },
+    {
+      "id": 139454,
+      "title": "Landscape",
+      "source": "https://clevelandart.org/art/1963.262",
+      "license": "CC0",
+      "path": "memory/paintings/4.jpg"
+    },
+    {
+      "id": 79932,
+      "title": "Landscape with Fishermen",
+      "source": "https://clevelandart.org/art/2015.516",
+      "license": "CC0",
+      "path": "memory/paintings/5.jpg"
+    },
+    {
+      "id": 143234,
+      "title": "Landscape with a Windmill\r\n",
+      "source": "https://clevelandart.org/art/1967.19",
+      "license": "CC0",
+      "path": "memory/paintings/6.jpg"
+    },
+    {
+      "id": 143602,
+      "title": "Low Waterfall in a Wooded Landscape with a Dead Beech Tree",
+      "source": "https://clevelandart.org/art/1967.63",
+      "license": "CC0",
+      "path": "memory/paintings/7.jpg"
+    },
+    {
+      "id": 159501,
+      "title": "Landscape with Peasants Dancing",
+      "source": "https://clevelandart.org/art/1996.271",
+      "license": "CC0",
+      "path": "memory/paintings/8.jpg"
+    },
+    {
+      "id": 83635,
+      "title": "Breton Landscape",
+      "source": "https://clevelandart.org/art/2020.117",
+      "license": "CC0",
+      "path": "memory/paintings/9.jpg"
+    },
+    {
+      "id": 149768,
+      "title": "Saint John the Baptist in a Landscape",
+      "source": "https://clevelandart.org/art/1979.80",
+      "license": "CC0",
+      "path": "memory/paintings/10.jpg"
+    },
+    {
+      "id": 149417,
+      "title": "Landscape with Gentle Peaks",
+      "source": "https://clevelandart.org/art/1978.7",
+      "license": "CC0",
+      "path": "memory/paintings/11.jpg"
+    }
+  ],
+  "florals": [
+    {
+      "id": 130391,
+      "title": "Spring Flowers",
+      "source": "https://clevelandart.org/art/1953.155",
+      "license": "CC0",
+      "path": "memory/florals/0.jpg"
+    },
+    {
+      "id": 136207,
+      "title": "Flowers in a Glass",
+      "source": "https://clevelandart.org/art/1960.108",
+      "license": "CC0",
+      "path": "memory/florals/1.jpg"
+    },
+    {
+      "id": 115067,
+      "title": "Vase of Flowers",
+      "source": "https://clevelandart.org/art/1935.233",
+      "license": "CC0",
+      "path": "memory/florals/2.jpg"
+    },
+    {
+      "id": 143462,
+      "title": "Ink Flowers",
+      "source": "https://clevelandart.org/art/1967.36",
+      "license": "CC0",
+      "path": "memory/florals/3.jpg"
+    },
+    {
+      "id": 153736,
+      "title": "Winter and Summer Flowers",
+      "source": "https://clevelandart.org/art/1987.40.1",
+      "license": "CC0",
+      "path": "memory/florals/4.jpg"
+    },
+    {
+      "id": 125886,
+      "title": "Birds and Flowers",
+      "source": "https://clevelandart.org/art/1948.128.2",
+      "license": "CC0",
+      "path": "memory/florals/5.jpg"
+    },
+    {
+      "id": 447758,
+      "title": "Dishes with Flowers",
+      "source": "https://clevelandart.org/art/2022.214",
+      "license": "CC0",
+      "path": "memory/florals/6.jpg"
+    },
+    {
+      "id": 519491,
+      "title": "Dish from Dishes with Flowers",
+      "source": "https://clevelandart.org/art/2022.214.1",
+      "license": "CC0",
+      "path": "memory/florals/7.jpg"
+    },
+    {
+      "id": 159152,
+      "title": "Mirror with Six Circular Flowers",
+      "source": "https://clevelandart.org/art/1995.341",
+      "license": "CC0",
+      "path": "memory/florals/8.jpg"
+    },
+    {
+      "id": 140279,
+      "title": "Teapot with Birds and Flowers",
+      "source": "https://clevelandart.org/art/1964.250",
+      "license": "CC0",
+      "path": "memory/florals/9.jpg"
+    },
+    {
+      "id": 143751,
+      "title": "Flowers and Grasses",
+      "source": "https://clevelandart.org/art/1968.193",
+      "license": "CC0",
+      "path": "memory/florals/10.jpg"
+    },
+    {
+      "id": 155085,
+      "title": "Flowers of a Hundred Worlds (Momoyogusa): Flower-draped Carts",
+      "source": "https://clevelandart.org/art/1989.85.2",
+      "license": "CC0",
+      "path": "memory/florals/11.jpg"
+    }
+  ],
+  "animals": [
+    {
+      "id": 155859,
+      "title": "Untitled (Farm Animals)",
+      "source": "https://clevelandart.org/art/1991.162",
+      "license": "CC0",
+      "path": "memory/animals/0.jpg"
+    },
+    {
+      "id": 103948,
+      "title": "Allegorical Theme:  Combat of Animals",
+      "source": "https://clevelandart.org/art/1922.141",
+      "license": "CC0",
+      "path": "memory/animals/1.jpg"
+    },
+    {
+      "id": 112103,
+      "title": "Orpheus Charming the Animals",
+      "source": "https://clevelandart.org/art/1930.579",
+      "license": "CC0",
+      "path": "memory/animals/2.jpg"
+    },
+    {
+      "id": 170828,
+      "title": "A floral fantasy of animals and birds (Waq-waq)",
+      "source": "https://clevelandart.org/art/2013.319",
+      "license": "CC0",
+      "path": "memory/animals/3.jpg"
+    },
+    {
+      "id": 156597,
+      "title": "Sketches of Animals (verso)",
+      "source": "https://clevelandart.org/art/1992.3.b",
+      "license": "CC0",
+      "path": "memory/animals/4.jpg"
+    },
+    {
+      "id": 170796,
+      "title": "Layla and Majnun in the wilderness with animals, from a Khamsa (Quintet) of Amir Khusrau Dihlavi",
+      "source": "https://clevelandart.org/art/2013.301",
+      "license": "CC0",
+      "path": "memory/animals/5.jpg"
+    },
+    {
+      "id": 679271,
+      "title": "Eight Immortals and Twelve Zodiac Animals",
+      "source": "https://clevelandart.org/art/2025.103",
+      "license": "CC0",
+      "path": "memory/animals/6.jpg"
+    },
+    {
+      "id": 157088,
+      "title": "Noah and the Animals Entering the Ark",
+      "source": "https://clevelandart.org/art/1993.222",
+      "license": "CC0",
+      "path": "memory/animals/7.jpg"
+    },
+    {
+      "id": 140408,
+      "title": "Peregrine Falcons (Duck Hawks)",
+      "source": "https://clevelandart.org/art/1964.351",
+      "license": "CC0",
+      "path": "memory/animals/8.jpg"
+    },
+    {
+      "id": 156595,
+      "title": "Poros Assailed by the Macedonian Army (recto); Sketches of Animals (verso)",
+      "source": "https://clevelandart.org/art/1992.3",
+      "license": "CC0",
+      "path": "memory/animals/9.jpg"
+    },
+    {
+      "id": 105365,
+      "title": "Fighting Animals",
+      "source": "https://clevelandart.org/art/1923.50",
+      "license": "CC0",
+      "path": "memory/animals/10.jpg"
+    },
+    {
+      "id": 150175,
+      "title": "A Sleeping Leopard",
+      "source": "https://clevelandart.org/art/1980.90",
+      "license": "CC0",
+      "path": "memory/animals/11.jpg"
+    }
+  ],
+  "patterns": [
+    {
+      "id": 156390,
+      "title": "Beaker with Scale Pattern",
+      "source": "https://clevelandart.org/art/1992.183",
+      "license": "CC0",
+      "path": "memory/patterns/0.jpg"
+    },
+    {
+      "id": 100713,
+      "title": "Fragment of a Band with Abstract Pattern",
+      "source": "https://clevelandart.org/art/1920.1101",
+      "license": "CC0",
+      "path": "memory/patterns/1.jpg"
+    },
+    {
+      "id": 100737,
+      "title": "Fragment of a Border with Abstract Pattern",
+      "source": "https://clevelandart.org/art/1920.1123",
+      "license": "CC0",
+      "path": "memory/patterns/2.jpg"
+    },
+    {
+      "id": 102494,
+      "title": "Band with Scroll Pattern",
+      "source": "https://clevelandart.org/art/1921.1139",
+      "license": "CC0",
+      "path": "memory/patterns/3.jpg"
+    },
+    {
+      "id": 95648,
+      "title": "Spread with floral medallion pattern",
+      "source": "https://clevelandart.org/art/1916.1359",
+      "license": "CC0",
+      "path": "memory/patterns/4.jpg"
+    },
+    {
+      "id": 130197,
+      "title": "Ceremonial Disk with Grain Pattern (Bi)",
+      "source": "https://clevelandart.org/art/1952.567",
+      "license": "CC0",
+      "path": "memory/patterns/5.jpg"
+    },
+    {
+      "id": 100742,
+      "title": "Fragment (of a Band?) with Floral Pattern",
+      "source": "https://clevelandart.org/art/1920.1128",
+      "license": "CC0",
+      "path": "memory/patterns/6.jpg"
+    },
+    {
+      "id": 123436,
+      "title": "Six-Color Chasuble Front with Animal Pattern",
+      "source": "https://clevelandart.org/art/1943.66",
+      "license": "CC0",
+      "path": "memory/patterns/7.jpg"
+    },
+    {
+      "id": 114056,
+      "title": "Cloth with Border of Vegetal Pattern",
+      "source": "https://clevelandart.org/art/1933.336",
+      "license": "CC0",
+      "path": "memory/patterns/8.jpg"
+    },
+    {
+      "id": 118249,
+      "title": "Fragment with palmette arches with Alhambra wall pattern",
+      "source": "https://clevelandart.org/art/1939.35",
+      "license": "CC0",
+      "path": "memory/patterns/9.jpg"
+    },
+    {
+      "id": 115447,
+      "title": "Fragment of a Band with Geometric Pattern and Floral Motif",
+      "source": "https://clevelandart.org/art/1936.221",
+      "license": "CC0",
+      "path": "memory/patterns/10.jpg"
+    },
+    {
+      "id": 147465,
+      "title": "Velvet with Pomegranate Pattern",
+      "source": "https://clevelandart.org/art/1973.20",
+      "license": "CC0",
+      "path": "memory/patterns/11.jpg"
+    }
+  ]
+}

@@ -8,6 +8,22 @@ export interface TurnAlert {
 
 export function getTurnAlert(game: GameState, userId: string, started: boolean): TurnAlert | null {
   const { room, pending_guess: pending } = game
+  if (room.duo_lobby) return null
+  if (room.game_kind === 'ring') return null
+  if (room.game_kind === 'dots') {
+    const dots = game.dots
+    return dots && !dots.finished && dots.turn_user === userId ? {
+      key: `${room.id}.dots.${dots.session_id}.${dots.turn_number}`,
+      kind: 'guess', message: 'Play your turn',
+    } : null
+  }
+  if (room.game_kind === 'memory') {
+    const memory = game.memory
+    return memory && !memory.finished && memory.turn_user === userId ? {
+      key: `${room.id}.memory.${memory.session_id}.${memory.turn_number}`,
+      kind: 'guess', message: 'Play your turn',
+    } : null
+  }
   if (room.variant !== 'turns' || room.status !== 'playing' || !started) return null
   const me = game.players.find(player => player.user_id === userId)
   if (!me) return null

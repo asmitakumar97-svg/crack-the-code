@@ -17,9 +17,9 @@ test('welcome page names the game and offers accessible play choices across size
     await connect(context, db)
     const page = await context.newPage()
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: 'Crack the Code', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Duo Dash', exact: true })).toBeVisible()
     await expect(page.getByLabel('Your name', { exact: true })).toHaveCount(0)
-    await expect(page.getByText('6-digit codes', { exact: true })).toBeVisible()
+    await expect(page.getByText('6-digit codes · 6-letter words', { exact: true })).toBeVisible()
     await expect(page.locator('.landing-demo .tile')).toHaveCount(18)
     await expect(page.locator('.landing-code-row').last().locator('.tile')).toHaveClass(Array(6).fill('tile hit filled'))
     for (const width of [320, 375, 768, 1280]) {
@@ -46,7 +46,10 @@ test('welcome page names the game and offers accessible play choices across size
           expect(box!.height).toBeGreaterThanOrEqual(80)
           expect(box!.x).toBeGreaterThanOrEqual(0)
           expect(box!.x + box!.width).toBeLessThanOrEqual(width)
-          if (width <= 375) expect(box!.y + box!.height).toBeLessThanOrEqual(844)
+        }
+        if (width <= 375) {
+          const primary = await page.getByRole('button', { name: 'Create or join a Duo room' }).boundingBox()
+          expect(primary!.y + primary!.height).toBeLessThanOrEqual(844)
         }
       }
     }
@@ -70,7 +73,7 @@ test('friend setup follows the welcome choice, survives reload, and Home clears 
     await page.reload()
     await expect(page.getByLabel('Your name', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Back to home', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Crack the Code', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Duo Dash', exact: true })).toBeVisible()
     expect(new URL(page.url()).searchParams.has('play')).toBe(false)
     await page.goto('/?room=ABC123&play=solo')
     await expect(page.getByLabel('Your name', { exact: true })).toBeVisible()
@@ -82,8 +85,8 @@ test('friend setup follows the welcome choice, survives reload, and Home clears 
     await page.reload()
     await expect(page.getByRole('heading', { name: 'Crack it solo.', exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Back to home', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Crack the Code', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Duo Dash', exact: true })).toBeVisible()
     await page.reload()
-    await expect(page.getByRole('heading', { name: 'Crack the Code', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Duo Dash', exact: true })).toBeVisible()
   } finally { await context.close(); await db.close() }
 })

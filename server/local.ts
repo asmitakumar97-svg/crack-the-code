@@ -3,6 +3,15 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { asPlayer, openGameDatabase } from './database'
 
 const RPCS = {
+  create_duo_room: ['p_name'],
+  open_duo_lobby: ['p_room'],
+  choose_duo_game: ['p_room', 'p_revision', 'p_game', 'p_tiles', 'p_theme', 'p_mode', 'p_variant', 'p_dots'],
+  confirm_duo_game: ['p_room', 'p_revision'],
+  flip_memory_card: ['p_room', 'p_session', 'p_move', 'p_index'],
+  roll_dots_dice: ['p_room', 'p_session', 'p_move'],
+  draw_dots_line: ['p_room', 'p_session', 'p_move', 'p_edge'],
+  move_ring: ['p_room', 'p_session', 'p_move', 'p_from', 'p_to', 'p_reset'],
+  move_solo_ring: ['p_game', 'p_move', 'p_from', 'p_to', 'p_reset'],
   create_room: ['p_name', 'p_mode', 'p_stake', 'p_wager', 'p_variant'],
   join_room: ['p_code', 'p_name'],
   set_wager: ['p_room', 'p_wager', 'p_match'],
@@ -18,6 +27,9 @@ const RPCS = {
   create_solo_game: ['p_mode', 'p_challenge'],
   get_solo_game: ['p_game'],
   submit_solo_guess: ['p_game', 'p_guess', 'p_attempt'],
+  create_solo_board: ['p_kind', 'p_difficulty', 'p_tiles', 'p_theme', 'p_dots'],
+  get_solo_board: ['p_game'],
+  play_solo_board: ['p_game', 'p_version', 'p_action', 'p_index'],
 } satisfies Record<string, string[]>
 
 class RequestError extends Error {

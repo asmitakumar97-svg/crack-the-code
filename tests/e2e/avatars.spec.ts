@@ -19,7 +19,7 @@ test('readable lock brand and character avatars fit mobile and desktop in both t
       await page.setViewportSize({ width, height: 844 })
       for (const theme of ['pastel', 'dark']) {
         await page.getByRole('button', { name: `Use ${theme} theme`, exact: true }).click()
-        await expect(page.locator('.brand-wordmark')).toContainText('Crack the Code')
+        await expect(page.locator('.brand-wordmark')).toContainText('Duo Dash')
         expect(await page.locator('.brand-wordmark').evaluate(element => parseFloat(getComputedStyle(element).fontSize))).toBeGreaterThanOrEqual(22)
         expect(await page.locator('.brand-wordmark').evaluate(element => parseFloat(getComputedStyle(element).letterSpacing))).toBeGreaterThanOrEqual(0)
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)

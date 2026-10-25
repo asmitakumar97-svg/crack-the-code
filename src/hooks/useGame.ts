@@ -22,6 +22,7 @@ export function useGame() {
   const pending = useRef(false)
   const currentRoom = useRef(roomId)
   currentRoom.current = roomId
+  const fastBoardSync = Boolean(game?.room.duo_lobby || game?.room.game_kind === 'dots' || game?.room.game_kind === 'ring')
 
   const refresh = useCallback(async (id: string) => {
     const state = await getState(id)
@@ -99,7 +100,7 @@ export function useGame() {
       finally { ticking = false }
     }
     void tick()
-    const timer = window.setInterval(() => { void tick() }, localPlay ? 1000 : 5000)
+    const timer = window.setInterval(() => { void tick() }, localPlay || fastBoardSync ? 1000 : 5000)
     const online = () => {
       setConnection('polling')
       void tick()
@@ -117,7 +118,7 @@ export function useGame() {
       document.removeEventListener('visibilitychange', visible)
       if (channel) void supabase?.removeChannel(channel)
     }
-  }, [roomId, userId, refresh])
+  }, [roomId, userId, refresh, fastBoardSync])
 
   const action = async (operation: () => Promise<void>) => {
     if (pending.current) return false
@@ -139,6 +140,11 @@ export function useGame() {
     const id = await authenticate()
     setUserId(id)
     enterRoom(await rpc<string>('create_room', { p_name: name, p_mode: mode, p_stake: stake, p_wager: '', p_variant: variant }))
+  })
+  const createDuoRoom = (name: string) => action(async () => {
+    const id = await authenticate()
+    setUserId(id)
+    enterRoom(await rpc<string>('create_duo_room', { p_name: name }))
   })
   const joinRoom = (name: string, code: string) => action(async () => {
     const id = await authenticate()
@@ -169,5 +175,5 @@ export function useGame() {
     setSyncError('')
     setLoading(false)
   }
-  return { roomId, game, userId, account, busy, loading, error, syncError, connection, words, clockOffset, createRoom, joinRoom, mutate, home, dismissError: () => setError('') }
+  return { roomId, game, userId, account, busy, loading, error, syncError, connection, words, clockOffset, createRoom, createDuoRoom, joinRoom, mutate, home, dismissError: () => setError('') }
 }

@@ -9,7 +9,7 @@ self.addEventListener('push', event => {
     const target = new URL(base)
     target.searchParams.set('room', data.roomCode)
     target.searchParams.set('notificationRoom', data.roomId)
-    await self.registration.showNotification('Crack the Code', {
+    await self.registration.showNotification('Duo Dash', {
       body: 'Play your turn',
       icon: new URL('icon-192.png', base).href,
       badge: new URL('icon-192.png', base).href,

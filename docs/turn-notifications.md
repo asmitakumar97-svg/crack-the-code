@@ -6,7 +6,9 @@ In a **Take turns** room, **Enable turn alerts** opts into a short sound and, if
 
 Alerts are generated when the opponent submits a guess that needs your clues, or when a new incoming turn needs your guess. Repeated polling/heartbeats do not replay them. Sending your own clues does not ping you again for your immediate follow-up guess. Race games and solo puzzles do not generate turn alerts. Notification text contains no names, bets, guesses or secrets.
 
-Both browser and phone notifications use the title **Crack the Code** and the short message **Play your turn**.
+Both browser and phone notifications use the title **Duo Dash** and the short message **Play your turn**. Memory Match also alerts the next player after a mismatch; finding a pair does not notify you about your own extra turn. Dots & Boxes alerts the incoming player when the previous player's rolled line budget is exhausted. Rolling, placing individual lines and claiming boxes do not replay a turn alert. Completed games and shared lobbies do not generate alerts.
+
+Solo games, including Memory Match, Dots & Boxes and Ring Rush against the computer, do not register incoming-turn events or send notifications. Ring Rush is a simultaneous race and never sends turn alerts in multiplayer either. Memory and Dots computer turns advance on the open game's polling loop; Ring Rush catches up elapsed-time computer moves when polled or before a human action.
 
 **Phone notifications** are a separate, persistent device opt-in. They use encrypted Web Push, a service worker, and server-triggered delivery, so they do not depend on the game tab polling while another app is open. Delivery is best-effort: device Focus modes, disabled permissions, network connectivity and OS/browser restrictions can delay or suppress it.
 

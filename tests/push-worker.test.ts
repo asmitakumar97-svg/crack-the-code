@@ -34,7 +34,7 @@ describe('phone notification service worker', () => {
     const sw = worker()
     await sw.emit('push', { data: { json: () => ({ kind, roomCode: 'ABC123', roomId, guess: 'DO NOT SHOW' }) } })
     const [title, options] = sw.showNotification.mock.calls[0]
-    expect(title).toBe('Crack the Code')
+    expect(title).toBe('Duo Dash')
     expect(options.body).toBe('Play your turn')
     expect(JSON.stringify(options)).not.toContain('DO NOT SHOW')
     expect(options.icon).toBe('https://example.test/crack-the-code/icon-192.png')

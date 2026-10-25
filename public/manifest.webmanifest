@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Crack the Code",
-  "short_name": "Crack the Code",
-  "description": "Crack codes and words, solo or with a friend.",
+  "name": "Duo Dash",
+  "short_name": "Duo Dash",
+  "description": "Crack the Code and Memory Match. One room, your favourite +1.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

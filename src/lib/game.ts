@@ -4,6 +4,43 @@ export type Mark = 'hit' | 'present' | 'miss'
 export type Stake = 'low' | 'high'
 export type Phase = 'lobby' | 'setting' | 'playing' | 'round_over' | 'match_over'
 export type SoloChallenge = 'attempts' | 'timed'
+export type SoloKind = 'code' | 'memory' | 'dots' | 'ring'
+export type Difficulty = 'easy' | 'medium' | 'hard'
+export interface BoardController {
+  userId: string
+  clockOffset: number
+  mutate: (name: string, args?: Record<string, unknown>) => Promise<boolean>
+}
+export interface BoardGame {
+  room: { host_id: string }
+  players: { user_id: string; name: string }[]
+}
+export interface BoardOptions {
+  tiles: 12 | 16 | 24
+  theme: MemoryTheme
+  dots: 10 | 12 | 15
+}
+export type SoloBoardState = {
+  id: string
+  difficulty: Difficulty
+  status: 'playing' | 'finished' | 'abandoned'
+  version: number
+  server_now: string
+  next_action_at: string | null
+  computer_id: string
+  move_accepted?: boolean
+} & ({ kind: 'memory'; board: MemoryState } | { kind: 'dots'; board: DotsState } | { kind: 'ring'; board: RingState })
+export interface RingState {
+  session_id: string
+  boards: Record<string, number[][]>
+  moves: Record<string, number>
+  resets: Record<string, number>
+  progress: Record<string, number>
+  started_at: string
+  finished: boolean
+  winner_id: string | null
+  finished_at: string | null
+}
 
 export const MODES = {
   number: { name: 'Number Lock', label: '01', length: 6, sample: ['3', '7', '1', '9', '0', '2'], detail: '6 digits', keys: '1234567890', description: 'Choose a secret six-digit code. Repeats and leading zeros are allowed.' },
@@ -39,6 +76,8 @@ export interface Room {
   variant: Variant
   turn_user_id: string | null
   started_at: string | null
+  game_kind?: 'code' | 'memory' | 'dots' | 'ring'
+  duo_lobby?: boolean
 }
 export interface Guess {
   id: string
@@ -63,6 +102,49 @@ export interface GameState {
   own_secret: string | null
   results: RoundResult[]
   server_now: string
+  hub?: HubState
+  memory?: MemoryState
+  dots?: DotsState
+  ring?: RingState
+}
+export interface HubState {
+  revision: number
+  selected: 'code' | 'memory' | 'dots' | 'ring'
+  tiles: 12 | 16 | 24
+  theme: MemoryTheme
+  mode: Mode
+  variant: Variant
+  ready: string[]
+  dots?: 10 | 12 | 15
+}
+export interface DotsState {
+  session_id: string
+  dots: 10 | 12 | 15
+  edges: (string | null)[]
+  boxes: (string | null)[]
+  scores: Record<string, number>
+  turn_user: string
+  turn_number: number
+  moves: number
+  roll: number | null
+  roll_user: string | null
+  roll_number: number
+  roll_until: string | null
+  remaining: number
+  finished: boolean
+}
+export type MemoryTheme = 'paintings' | 'florals' | 'animals' | 'patterns'
+export interface MemoryState {
+  session_id: string
+  moves: number
+  turn_number: number
+  turn_user: string
+  scores: Record<string, number>
+  finished: boolean
+  reveal_until: string | null
+  theme: MemoryTheme
+  cards: (number | null)[]
+  matched: number[]
 }
 export interface BetRecord {
   id: string

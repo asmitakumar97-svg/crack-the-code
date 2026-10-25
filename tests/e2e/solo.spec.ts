@@ -131,7 +131,7 @@ test('solo timer has unlimited guesses, survives navigation and reload, and stop
     }
     await expect(page.getByLabel('Time remaining')).toBeVisible()
     await page.getByRole('button', { name: 'Back to home', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Crack the Code', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Duo Dash', exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Play solo', exact: true }).click()
     await expect(page.locator('.history-row')).toHaveCount(9)
     await page.reload()

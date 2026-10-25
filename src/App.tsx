@@ -8,15 +8,16 @@ import { ScreenSteps, SetupFlow } from './components/SetupFlow'
 import { localPlay } from './lib/supabase'
 import { ThemeControl } from './components/ThemeControl'
 import { PlayerPanel } from './components/PlayerPanel'
-import { SoloGame } from './components/SoloGame'
+import { SoloArcade } from './components/SoloArcade'
 import { HistoryPanel } from './components/HistoryPanel'
 import { PlayerAvatar } from './components/PlayerAvatar'
 import { getGooglePhoto } from './lib/avatars'
 import { LandingPage } from './components/LandingPage'
 import { TurnAlerts } from './components/TurnAlerts'
+import { DuoEntry, DuoRoom } from './components/DuoRoom'
 
 type Controller = ReturnType<typeof useGame>
-type HomeScreen = 'home' | 'friend' | 'solo'
+type HomeScreen = 'home' | 'friend' | 'solo' | 'duo'
 
 export default function App() {
   const controller = useGame()
@@ -26,18 +27,20 @@ export default function App() {
   const [homeVariant, setHomeVariant] = useState<Variant>('race')
   const [screen, setScreen] = useState<HomeScreen>(() => {
     const query = new URLSearchParams(location.search)
-    return query.has('room') ? 'friend' : query.get('play') === 'solo' ? 'solo' : query.get('play') === 'friend' ? 'friend' : 'home'
+    return query.get('play') === 'duo' ? 'duo' : query.has('room') ? 'friend' : query.get('play') === 'solo' ? 'solo' : query.get('play') === 'friend' ? 'friend' : 'home'
   })
   const solo = screen === 'solo'
   const [soloChallenge, setSoloChallenge] = useState<SoloChallenge>('attempts')
   const [navigationError, setNavigationError] = useState('')
   const { roomId, game, loading, error, syncError } = controller
+  const sharedBoard = Boolean(game && (game.room.duo_lobby || game.room.game_kind && game.room.game_kind !== 'code'))
   const choosePlay = (next: HomeScreen) => {
     setScreen(next)
     try {
       const url = new URL(location.href)
       if (next === 'home') { url.searchParams.delete('play'); url.searchParams.delete('room'); url.searchParams.delete('notificationRoom') }
       else url.searchParams.set('play', next)
+      if (next !== 'solo') url.searchParams.delete('soloGame')
       history.replaceState(null, '', url)
       setNavigationError('')
     } catch { setNavigationError('Your screen changed, but this browser could not update the page address. Reloading may return you to the welcome screen.') }
@@ -45,14 +48,14 @@ export default function App() {
   const home = () => { controller.home(); choosePlay('home') }
   useEffect(() => { window.scrollTo(0, 0) }, [screen])
   return <div className="app-shell">
-    <header className="site-header"><div className="brand"><img src={`${import.meta.env.BASE_URL}favicon.svg?v=lock-tiles`} width={48} height={48} alt="" /><span className="brand-wordmark">Crack the Code<small>A LITTLE LOGIC. A LITTLE MAGIC.</small></span></div><div className="header-actions"><ThemeControl /><button className="icon-button account-button" aria-label="Player account and bet history" onClick={() => setProfile(true)}><PlayerAvatar identity={controller.userId} name="You" photoUrl={getGooglePhoto(controller.account)} /></button><button className="icon-button" aria-label="How to play" onClick={() => setHelp(true)}><CircleHelp size={20} /></button></div></header>
+    <header className="site-header"><div className="brand"><img src={`${import.meta.env.BASE_URL}duo.svg`} width={48} height={48} alt="" /><span className="brand-wordmark">Duo Dash<small>YOUR FAVOURITE +1.</small></span></div><div className="header-actions"><ThemeControl /><button className="icon-button account-button" aria-label="Player account and bet history" onClick={() => setProfile(true)}><PlayerAvatar identity={controller.userId} name="You" photoUrl={getGooglePhoto(controller.account)} /></button><button className="icon-button" aria-label="How to play" onClick={() => setHelp(true)}><CircleHelp size={20} /></button></div></header>
     <main>
-      {localPlay && <div className="local-play-notice" role="status"><strong>Local multiplayer</strong><span>Player 2: open this address in a private browser window. Updates every second.</span></div>}
+      {localPlay && <div className="local-play-notice" role="status"><strong>{solo && !roomId ? 'Local solo play' : 'Local multiplayer'}</strong><span>{solo && !roomId ? 'All games run on this Mac. No second player needed.' : 'Player 2: open this address in a private browser window. Updates every second.'}</span></div>}
       {(error || syncError) && <div className="error-banner" role="alert"><span>{error || syncError}</span>{error && <button className="icon-button" aria-label="Dismiss error" onClick={controller.dismissError}><X size={17} /></button>}</div>}
       {navigationError && <p className="field-error" role="alert">{navigationError}</p>}
-      {!roomId ? screen === 'home' ? <LandingPage onPlay={choosePlay} onHelp={() => setHelp(true)} busy={controller.busy} /> : solo ? <SoloGame userId={controller.userId} mode={homeMode} challenge={soloChallenge} onModeChange={setHomeMode} onChallengeChange={setSoloChallenge} onHelp={() => setHelp(true)} onHome={() => choosePlay('home')} /> : <SetupFlow controller={controller} mode={homeMode} setMode={setHomeMode} variant={homeVariant} setVariant={setHomeVariant} onHome={() => choosePlay('home')} /> : !game ? <section className="panel loading-panel">{loading ? <LoaderCircle className="spin mint" size={28} /> : <WifiOff size={28} />}<h1>{loading ? 'Opening your room…' : 'Couldn’t connect'}</h1><button className="button secondary" onClick={home}>Back</button></section> : <Game controller={controller} game={game} onHelp={() => setHelp(true)} onHome={home} />}
+      {!roomId ? screen === 'home' ? <LandingPage onPlay={choosePlay} onRoom={() => choosePlay('duo')} onHelp={() => setHelp(true)} busy={controller.busy} /> : screen === 'duo' ? <DuoEntry controller={controller} onHome={() => choosePlay('home')} /> : solo ? <SoloArcade userId={controller.userId} mode={homeMode} challenge={soloChallenge} onModeChange={setHomeMode} onChallengeChange={setSoloChallenge} onHelp={() => setHelp(true)} onHome={() => choosePlay('home')} /> : <SetupFlow controller={controller} mode={homeMode} setMode={setHomeMode} variant={homeVariant} setVariant={setHomeVariant} onHome={() => choosePlay('home')} /> : !game ? <section className="panel loading-panel">{loading ? <LoaderCircle className="spin mint" size={28} /> : <WifiOff size={28} />}<h1>{loading ? 'Opening your room…' : 'Couldn’t connect'}</h1><button className="button secondary" onClick={home}>Back</button></section> : sharedBoard ? <DuoRoom controller={controller} game={game} onHome={home} /> : <Game controller={controller} game={game} onHelp={() => setHelp(true)} onHome={home} />}
     </main>
-    {help && <Rules mode={game?.room.mode ?? homeMode} turns={(game?.room.variant ?? homeVariant) === 'turns'} solo={!roomId && solo ? soloChallenge : undefined} onClose={() => setHelp(false)} />}
+    {help && (sharedBoard || screen === 'duo' || screen === 'home' || solo && ['memory', 'dots', 'ring'].includes(new URLSearchParams(location.search).get('soloGame') ?? '') ? <Modal title="How to play Duo Dash" onClose={() => setHelp(false)}><p>Create a Duo room and invite your +1. The host picks Crack the Code, Memory Match, Dots &amp; Boxes or Ring Rush and both players confirm. Finish the current game, then choose another without changing rooms.</p><p>Play solo offers every game without a room. Crack the Code has six guesses or a three-minute timer. The other games have Easy, Medium and Hard computer opponents. Memory and Dots computer turns resume when you return; Ring Rush’s race clock and computer keep going if you leave. Solo games do not send turn notifications.</p><p>Ring Rush: 20 rings, four colours and five rods. Move a top ring onto an empty rod or the same colour. Both racers start with the same solvable puzzle after a shared countdown. First to sort four complete colour stacks wins. Restarting your own rings never resets the timer.</p><p>Dots &amp; Boxes: choose 10, 12 or 15 dots per side. Roll an eight-sided dice, then draw that many lines. Close a box to claim it; no bonus rolls. Pass after using your lines. Most boxes wins.</p><p>Memory Match: flip two tiles, keep matching pairs and take another turn. A mismatch passes the turn. Most pairs wins. Choose 12, 16 or 24 tiles and a picture theme.</p><p>Crack the Code: privately lock six digits or a six-letter word, agree bets and solve your rival’s secret. First to solve wins each round; best of three.</p></Modal> : <Rules mode={game?.room.mode ?? homeMode} turns={(game?.room.variant ?? homeVariant) === 'turns'} solo={!roomId && solo ? soloChallenge : undefined} onClose={() => setHelp(false)} />)}
     {profile && <Modal title="Your player & bets" onClose={() => setProfile(false)}><PlayerPanel userId={controller.userId} user={controller.account} inRoom={Boolean(roomId) || solo} /></Modal>}
   </div>
 }
@@ -72,6 +75,7 @@ function Game({ controller, game, onHelp, onHome }: { controller: Controller; ga
   const preparing = room.status === 'lobby' || room.status === 'setting'
   return <section className="game-shell"><ScreenSteps current={preparing ? 3 : 4} />
     <div className="game-nav"><button className="icon-button" aria-label="Go home" onClick={() => setLeave(true)}><ArrowLeft size={19} /></button><span>{MODES[room.mode].name} · {room.variant === 'race' ? 'Live race' : 'Take turns'}</span><RoomCode code={room.code} /></div>
+    {room.host_id === me.user_id && (room.status === 'match_over' || room.status === 'lobby' && !players.some(player => player.secret_ready)) && <button className="button secondary" disabled={controller.busy || controller.connection === 'offline'} onClick={() => { void controller.mutate('open_duo_lobby') }}>Choose another game in this room</button>}
     <div className="scoreboard"><PlayerBadge player={me} you online={controller.connection !== 'offline'} /><div className="score-center"><div><strong>{me.score}</strong><span>:</span><strong>{opponent?.score ?? 0}</strong></div><small>{room.status === 'lobby' ? 'BEST OF THREE' : `ROUND ${room.round_number} / 3`}</small></div>{opponent ? <PlayerBadge player={opponent} online={Boolean(opponentOnline)} /> : <div className="player-badge"><span className="avatar empty"><Users size={21} /></span><strong>Waiting…</strong></div>}</div>
     {controller.connection === 'offline' && <div className="notice"><WifiOff size={16} />You’re offline. Reconnecting…</div>}
     {opponent && !opponentOnline && <div className="notice"><WifiOff size={16} />{opponent.name} is reconnecting.</div>}

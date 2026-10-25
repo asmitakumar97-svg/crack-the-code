@@ -112,7 +112,7 @@ test('notification links open the authorized target room instead of a different 
     expect(await page.evaluate(() => localStorage.getItem('crack-the-code.room'))).toBe(target)
     await page.getByRole('button', { name: 'Go home', exact: true }).click()
     await page.getByRole('button', { name: 'Home', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Crack the Code', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Duo Dash', exact: true })).toBeVisible()
     expect(new URL(page.url()).searchParams.has('notificationRoom')).toBe(false)
   } finally { await context.close(); await db.close() }
 })
